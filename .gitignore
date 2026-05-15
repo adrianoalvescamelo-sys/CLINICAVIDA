@@ -1,0 +1,64 @@
+# Dependencies — all levels
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+build/
+.next/
+backend/dist/
+frontend/dist/
+
+# Environment files — never commit secrets
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Vim swap files
+*.swp
+*.swo
+
+# Postgres data volume
+postgres-data/
+
+# PWA build artifacts
+sw.js
+workbox-*.js
+
+# Claude Code local settings (machine-specific permissions)
+.claude/settings.local.json
+
+# Prisma generated client (not migrations — migrations go to repo)
+backend/src/generated/
+
+# Build/cache tooling
+.turbo/
+.cache/
+.parcel-cache/
+.pnp
+.pnp.js

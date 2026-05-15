@@ -1,0 +1,22 @@
+{
+  "name": "clinica-vida",
+  "version": "0.1.0",
+  "private": true,
+  "description": "App interno Clínica Vida Popular — Sinop/MT",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:db": "docker compose up -d postgres",
+    "dev:db:stop": "docker compose stop postgres",
+    "dev:db:logs": "docker compose logs -f postgres",
+    "dev:backend": "npm --workspace backend run start:dev",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "build": "npm --workspace backend run build && npm --workspace frontend run build",
+    "test": "npm --workspace backend test && npm --workspace frontend test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

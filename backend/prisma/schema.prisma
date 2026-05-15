@@ -1,0 +1,300 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id              String      @id @default(uuid()) @db.Uuid
+  email           String      @unique
+  senhaHash       String      @map("senha_hash")
+  nomeCompleto    String      @map("nome_completo")
+  perfil          PerfilTipo
+  ativo           Boolean     @default(true)
+  tentativasLogin Int         @default(0) @map("tentativas_login")
+  bloqueadoAte    DateTime?   @map("bloqueado_ate")
+  ultimoLoginEm   DateTime?   @map("ultimo_login_em")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  auditorias      Auditoria[]
+
+  @@map("usuarios")
+}
+
+model Paciente {
+  id                 String              @id @default(uuid()) @db.Uuid
+  cpf                String              @unique @db.VarChar(11)
+  nomeCompleto       String              @map("nome_completo")
+  dataNascimento     DateTime            @map("data_nascimento") @db.Date
+  sexo               Sexo                @default(NAO_INFORMADO)
+  telefoneWhatsapp   String              @map("telefone_whatsapp") @db.VarChar(20)
+  telefoneSecundario String?             @map("telefone_secundario") @db.VarChar(20)
+  email              String?             @db.VarChar(255)
+  responsavelNome    String?             @map("responsavel_nome")
+  responsavelCpf     String?             @map("responsavel_cpf") @db.VarChar(11)
+  endereco           Json?
+  observacoes        String?
+  criadoPor          String?             @map("criado_por") @db.Uuid
+  atualizadoPor      String?             @map("atualizado_por") @db.Uuid
+  deletedAt          DateTime?           @map("deleted_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  agendamentos       Agendamento[]
+  listaEspera        ListaEspera[]
+  mensagens          MensagemWhatsapp[]
+  historico          PacienteHistorico[]
+
+  @@index([nomeCompleto])
+  @@index([telefoneWhatsapp])
+  @@index([deletedAt])
+  @@map("pacientes")
+}
+
+model Profissional {
+  id               String           @id @default(uuid()) @db.Uuid
+  nomeCompleto     String           @map("nome_completo")
+  especialidade    String?
+  registroConselho String?          @map("registro_conselho")
+  ehMedico         Boolean          @default(false) @map("eh_medico")
+  ativo            Boolean          @default(true)
+  usuarioId        String?          @unique @map("usuario_id") @db.Uuid
+  cor              String?          @db.VarChar(7)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  agendamentos     Agendamento[]
+  bloqueios        BloqueioAgenda[]
+  listaEspera      ListaEspera[]
+
+  @@index([ativo])
+  @@map("profissionais")
+}
+
+model ListaEspera {
+  id               String            @id @default(uuid()) @db.Uuid
+  pacienteId       String            @map("paciente_id") @db.Uuid
+  profissionalId   String?           @map("profissional_id") @db.Uuid
+  especialidade    String?
+  prioridade       Int               @default(0)
+  melhoresHorarios Json?             @map("melhores_horarios")
+  observacoes      String?
+  status           ListaEsperaStatus @default(ATIVO)
+  ultimaOfertaEm   DateTime?         @map("ultima_oferta_em")
+  ultimaRespostaEm DateTime?         @map("ultima_resposta_em")
+  motivoRecusa     String?           @map("motivo_recusa")
+  criadoPor        String?           @map("criado_por") @db.Uuid
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  paciente         Paciente          @relation(fields: [pacienteId], references: [id])
+  profissional     Profissional?     @relation(fields: [profissionalId], references: [id])
+
+  @@index([status, prioridade, createdAt])
+  @@index([pacienteId, status])
+  @@map("lista_espera")
+}
+
+model Agendamento {
+  id                 String                 @id @default(uuid()) @db.Uuid
+  pacienteId         String                 @map("paciente_id") @db.Uuid
+  profissionalId     String                 @map("profissional_id") @db.Uuid
+  dataHoraInicio     DateTime               @map("data_hora_inicio")
+  dataHoraFim        DateTime               @map("data_hora_fim")
+  tipo               TipoAtendimento        @default(CONSULTA)
+  status             AgendamentoStatus
+  origem             AgendamentoOrigem
+  encaixe            Boolean                @default(false)
+  observacoes        String?
+  motivoCancelamento String?                @map("motivo_cancelamento")
+  eventId            String?                @unique @map("event_id")
+  criadoPor          String?                @map("criado_por") @db.Uuid
+  atualizadoPor      String?                @map("atualizado_por") @db.Uuid
+  confirmadoEm       DateTime?              @map("confirmado_em")
+  canceladoEm        DateTime?              @map("cancelado_em")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+  paciente           Paciente               @relation(fields: [pacienteId], references: [id])
+  profissional       Profissional           @relation(fields: [profissionalId], references: [id])
+  historico          AgendamentoHistorico[]
+  mensagens          MensagemWhatsapp[]
+
+  @@index([profissionalId, dataHoraInicio])
+  @@index([pacienteId, dataHoraInicio])
+  @@index([status])
+  @@index([dataHoraInicio])
+  @@index([origem])
+  @@map("agendamentos")
+}
+
+model AgendamentoHistorico {
+  id             String             @id @default(uuid()) @db.Uuid
+  agendamentoId  String             @map("agendamento_id") @db.Uuid
+  usuarioId      String?            @map("usuario_id") @db.Uuid
+  acao           String
+  statusAnterior AgendamentoStatus? @map("status_anterior")
+  statusNovo     AgendamentoStatus? @map("status_novo")
+  diff           Json
+  traceId        String             @map("trace_id")
+  createdAt      DateTime           @default(now()) @map("created_at")
+  agendamento    Agendamento        @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
+
+  @@index([agendamentoId, createdAt])
+  @@map("agendamentos_historico")
+}
+
+model MensagemWhatsapp {
+  id             String          @id @default(uuid()) @db.Uuid
+  pacienteId     String?         @map("paciente_id") @db.Uuid
+  agendamentoId  String?         @map("agendamento_id") @db.Uuid
+  telefone       String          @db.VarChar(20)
+  direcao        MensagemDirecao @default(OUTBOUND)
+  tipo           MensagemTipo
+  status         MensagemStatus  @default(PENDENTE)
+  tentativas     Int             @default(0)
+  proximoRetryEm DateTime?       @map("proximo_retry_em")
+  payload        Json
+  resposta       String?
+  erro           String?
+  eventId        String          @unique @map("event_id")
+  providerMsgId  String?         @map("provider_msg_id")
+  enviadaEm      DateTime?       @map("enviada_em")
+  entregueEm     DateTime?       @map("entregue_em")
+  respondidaEm   DateTime?       @map("respondida_em")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  agendamento    Agendamento?    @relation(fields: [agendamentoId], references: [id])
+  paciente       Paciente?       @relation(fields: [pacienteId], references: [id])
+
+  @@index([status, proximoRetryEm])
+  @@index([pacienteId, createdAt])
+  @@index([agendamentoId])
+  @@map("mensagens_whatsapp")
+}
+
+model BloqueioAgenda {
+  id             String       @id @default(uuid()) @db.Uuid
+  profissionalId String       @map("profissional_id") @db.Uuid
+  dataHoraInicio DateTime     @map("data_hora_inicio")
+  dataHoraFim    DateTime     @map("data_hora_fim")
+  motivo         String?
+  criadoPor      String?      @map("criado_por") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at")
+  profissional   Profissional @relation(fields: [profissionalId], references: [id], onDelete: Cascade)
+
+  @@index([profissionalId, dataHoraInicio])
+  @@map("bloqueios_agenda")
+}
+
+model PacienteHistorico {
+  id         String   @id @default(uuid()) @db.Uuid
+  pacienteId String   @map("paciente_id") @db.Uuid
+  usuarioId  String?  @map("usuario_id") @db.Uuid
+  acao       String
+  diff       Json
+  traceId    String   @map("trace_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  paciente   Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@index([pacienteId, createdAt])
+  @@map("pacientes_historico")
+}
+
+model Auditoria {
+  id            String         @id @default(uuid()) @db.Uuid
+  usuarioId     String?        @map("usuario_id") @db.Uuid
+  acao          String
+  entidade      String
+  registroId    String?        @map("registro_id")
+  dataHora      DateTime       @default(now()) @map("data_hora")
+  ipDispositivo String?        @map("ip_dispositivo")
+  resultado     AuditResultado
+  traceId       String         @map("trace_id")
+  detalhes      Json?
+  usuario       Usuario?       @relation(fields: [usuarioId], references: [id])
+
+  @@index([usuarioId])
+  @@index([entidade, registroId])
+  @@index([dataHora])
+  @@index([traceId])
+  @@map("auditoria")
+}
+
+enum PerfilTipo {
+  ADMIN
+  RECEPCAO
+  MEDICO
+  PROFISSIONAL_NAO_MEDICO
+}
+
+enum AuditResultado {
+  SUCESSO
+  FALHA
+  NEGADO
+}
+
+enum Sexo {
+  MASCULINO
+  FEMININO
+  OUTRO
+  NAO_INFORMADO
+}
+
+enum AgendamentoStatus {
+  SOLICITADO
+  PRE_AGENDAMENTO
+  CONFIRMADO
+  CONFIRMACAO_TARDIA
+  AGUARDANDO
+  EM_ATENDIMENTO
+  ATENDIDO
+  FALTOU
+  CANCELADO
+}
+
+enum AgendamentoOrigem {
+  RECEPCAO
+  ADMIN
+  BOT_WHATSAPP
+  PACIENTE_WHATSAPP
+}
+
+enum TipoAtendimento {
+  CONSULTA
+  RETORNO
+  EXAME
+  PROCEDIMENTO
+  OUTRO
+}
+
+enum MensagemTipo {
+  CONFIRMACAO_24H
+  LEMBRETE_2H
+  CONFIRMACAO_TARDIA
+  CANCELAMENTO
+  REMARCACAO
+  VAGA_LIBERADA
+  CUSTOM
+}
+
+enum MensagemStatus {
+  PENDENTE
+  ENVIADA
+  ENTREGUE
+  RESPONDIDA
+  FALHA
+  CANCELADA
+}
+
+enum MensagemDirecao {
+  OUTBOUND
+  INBOUND
+}
+
+enum ListaEsperaStatus {
+  ATIVO
+  CONTATADO
+  RECUSADO
+  AGENDADO
+  CANCELADO
+}

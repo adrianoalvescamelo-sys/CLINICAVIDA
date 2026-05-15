@@ -1,0 +1,803 @@
+{
+  "spec": {
+    "nome": "SPEC — App Clínica Vida",
+    "produto": "App Clínica Vida",
+    "cliente_uso": "Clínica Vida Popular — Sinop/MT",
+    "tipo": "Aplicativo interno de uso exclusivo da clínica",
+    "modelo_comercial": "Não será comercializado como SaaS",
+    "versao": "1.1 — SPEC revisada",
+    "data_revisao": "2026-05-14",
+    "origem": "PRD consolidado revisado em entrevista com o usuário",
+    "objetivo_mvp": "Sistema web/PWA para cadastro de pacientes, agenda, agendamentos, lista de espera, painel da recepção, relatórios básicos e integração com WhatsApp via n8n/Evolution API.",
+    "fora_do_escopo_mvp": [
+      "Módulo financeiro",
+      "Fluxo de caixa",
+      "Pagamentos",
+      "Faturamento",
+      "Cobrança online",
+      "Telemedicina",
+      "Portal do paciente",
+      "App mobile nativo",
+      "Prescrição digital avançada",
+      "Assinatura digital",
+      "Integração com laboratório",
+      "Controle de estoque"
+    ],
+    "decisoes_negocio": [
+      {
+        "id": 1,
+        "tema": "Duplicidade de paciente",
+        "decisao": "Bloquear duplicidade por CPF obrigatório."
+      },
+      {
+        "id": 2,
+        "tema": "Edição de cadastro",
+        "decisao": "Admin e recepção podem alterar qualquer dado cadastral."
+      },
+      {
+        "id": 3,
+        "tema": "Confirmação WhatsApp",
+        "decisao": "Enviar automaticamente 24h antes e repetir 2h antes se não responder."
+      },
+      {
+        "id": 4,
+        "tema": "Confirmação tardia",
+        "decisao": "Aceitar confirmação só até 2h antes; depois marcar como confirmação tardia para recepção decidir."
+      },
+      {
+        "id": 5,
+        "tema": "Cancelamento/remarcação",
+        "decisao": "Permitir cancelar/remarcar automaticamente até 2h antes."
+      },
+      {
+        "id": 6,
+        "tema": "Conflito de agenda",
+        "decisao": "Permitir encaixe, mas exigir confirmação manual da recepção."
+      },
+      {
+        "id": 7,
+        "tema": "Lista de espera",
+        "decisao": "Ordenar por prioridade definida pela recepção/admin."
+      },
+      {
+        "id": 8,
+        "tema": "Bloqueio/liberação de horários",
+        "decisao": "Cada profissional pode bloquear/liberar sua própria agenda; admin pode alterar todas."
+      },
+      {
+        "id": 9,
+        "tema": "Agendamento pelo bot",
+        "decisao": "Criar como pré-agendamento, exigindo confirmação da recepção."
+      },
+      {
+        "id": 10,
+        "tema": "Dados visíveis ao médico",
+        "decisao": "Médico pode acessar todos os dados do paciente."
+      },
+      {
+        "id": 11,
+        "tema": "Painel de chamada",
+        "decisao": "Exibir nome completo do paciente."
+      },
+      {
+        "id": 12,
+        "tema": "Prontuário eletrônico",
+        "decisao": "Fica para Fase 2, depois de agenda/WhatsApp/recepção."
+      },
+      {
+        "id": 13,
+        "tema": "IA no sistema",
+        "decisao": "IA pode apoiar prontuário, hipótese clínica e conduta, mas nunca finalizar sem aprovação médica."
+      },
+      {
+        "id": 14,
+        "tema": "Unidades/filiais",
+        "decisao": "Sistema começa com uma unidade única, sem multiunidade no MVP."
+      },
+      {
+        "id": 15,
+        "tema": "Relatórios do MVP",
+        "decisao": "Agenda do dia, agendamentos por status, pacientes cadastrados no período e origem dos agendamentos."
+      }
+    ],
+    "padroes_tecnicos_globais": {
+      "response_schema": {
+        "success": "boolean",
+        "data": "object|null",
+        "error": {
+          "code": "string",
+          "message": "string",
+          "details": "object|null",
+          "trace_id": "string"
+        }
+      },
+      "status_codes_padrao": {
+        "200": "Operação realizada com sucesso",
+        "201": "Registro criado",
+        "204": "Operação concluída sem corpo de resposta",
+        "400": "Payload inválido ou parâmetro ausente",
+        "401": "Usuário não autenticado",
+        "403": "Usuário sem permissão",
+        "404": "Registro não encontrado",
+        "409": "Conflito de regra de negócio, como CPF duplicado ou agenda ocupada",
+        "422": "Dados válidos no formato, mas recusados por regra de negócio",
+        "429": "Muitas requisições",
+        "500": "Erro interno inesperado",
+        "503": "Integração externa indisponível"
+      },
+      "payload_limit": "1 MB para APIs comuns; 10 MB para upload de anexos no MVP, salvo configuração específica.",
+      "timeouts": {
+        "api_http": "30 segundos",
+        "n8n_webhook": "10 segundos",
+        "evolution_api": "15 segundos",
+        "ia_gateway": "60 segundos",
+        "google_drive": "30 segundos"
+      },
+      "retry_fallback": {
+        "n8n_evolution_api": "retry 3x com backoff exponencial; se falhar, marcar mensagem como pendente e avisar recepção",
+        "ia_gateway": "retry 1x; se falhar, exibir indisponibilidade sem bloquear atendimento",
+        "google_drive": "retry 2x; se falhar, manter arquivo em fila de sincronização"
+      }
+    },
+    "perfis_permissoes": [
+      {
+        "perfil": "Administrador geral",
+        "permissoes": [
+          "Gerenciar usuários",
+          "Gerenciar perfis",
+          "Ver todas as agendas",
+          "Alterar configurações",
+          "Acessar relatórios",
+          "Alterar todas as agendas",
+          "Acessar logs"
+        ]
+      },
+      {
+        "perfil": "Recepção/admin",
+        "permissoes": [
+          "Cadastrar pacientes",
+          "Editar qualquer dado cadastral",
+          "Criar/remarcar/cancelar agendamentos",
+          "Criar encaixes",
+          "Gerenciar lista de espera",
+          "Enviar WhatsApp",
+          "Confirmar presença",
+          "Marcar falta"
+        ],
+        "restricoes": [
+          "Não acessa prontuário",
+          "Não vê evolução clínica",
+          "Não vê documentos clínicos sensíveis"
+        ]
+      },
+      {
+        "perfil": "Médico",
+        "permissoes": [
+          "Ver própria agenda",
+          "Bloquear/liberar próprios horários",
+          "Ver todos os dados do paciente",
+          "Chamar paciente no painel",
+          "Confirmar atendimento realizado",
+          "Na Fase 2, acessar prontuário e documentos médicos"
+        ]
+      },
+      {
+        "perfil": "Profissional de saúde não médico",
+        "permissoes": [
+          "Ver própria agenda",
+          "Bloquear/liberar próprios horários quando autorizado",
+          "Ver dados básicos do paciente",
+          "Confirmar atendimento realizado"
+        ],
+        "restricoes": [
+          "Não prescreve como médico",
+          "Não gera receita médica",
+          "Não gera atestado médico"
+        ]
+      }
+    ],
+    "sprints": [
+      {
+        "id": 1,
+        "nome": "Base técnica, autenticação e permissões",
+        "descricao": "Criar fundação segura do sistema interno, com login, perfis, auditoria, ambientes e saúde da aplicação.",
+        "entregavel": "Aplicação web/PWA com autenticação, perfis iniciais, auditoria básica e endpoints de health check.",
+        "risco": "médio",
+        "pre_requisito": null,
+        "features": [
+          {
+            "categoria": "auth",
+            "descricao": "Login com e-mail e senha para usuários internos",
+            "steps": [
+              "Criar tela de login",
+              "Validar e-mail e senha",
+              "Criar sessão individual",
+              "Aplicar expiração de sessão",
+              "Registrar login e logout em auditoria",
+              "Bloquear contas após tentativas excessivas"
+            ],
+            "acceptance_criteria": [
+              "Usuário válido acessa o sistema",
+              "Usuário inválido recebe erro 401 sem expor detalhes",
+              "Conta com excesso de tentativas recebe bloqueio temporário",
+              "Todas as tentativas relevantes aparecem nos logs"
+            ],
+            "edge_cases": [
+              "E se a senha estiver errada: retornar 401",
+              "E se o usuário estiver bloqueado: retornar 403",
+              "E se houver muitas tentativas: aplicar rate limit e lockout",
+              "E se a sessão expirar: redirecionar para login sem perder segurança"
+            ]
+          },
+          {
+            "categoria": "auth",
+            "descricao": "Controle de perfis e permissões",
+            "steps": [
+              "Cadastrar perfis admin, recepção, médico e profissional não médico",
+              "Aplicar middleware de autorização",
+              "Bloquear acesso da recepção ao prontuário",
+              "Permitir admin alterar permissões",
+              "Registrar alteração de permissão em auditoria"
+            ],
+            "acceptance_criteria": [
+              "Recepção não acessa rotas clínicas",
+              "Médico acessa dados do paciente conforme regra definida",
+              "Admin acessa relatórios e configurações",
+              "Alterações de permissão geram log"
+            ],
+            "edge_cases": [
+              "E se usuário sem permissão acessar rota protegida: retornar 403",
+              "E se perfil for removido com usuário ativo: impedir remoção ou exigir reassociação",
+              "E se permissão mudar durante sessão: revalidar no próximo request"
+            ]
+          },
+          {
+            "categoria": "infra",
+            "descricao": "Ambientes, health check, logs e graceful shutdown",
+            "steps": [
+              "Configurar produção, homologação e desenvolvimento",
+              "Criar endpoint /health",
+              "Criar endpoint /ready",
+              "Configurar logs estruturados com trace_id",
+              "Implementar graceful shutdown",
+              "Separar variáveis de ambiente por ambiente"
+            ],
+            "acceptance_criteria": [
+              "/health responde 200 quando app está vivo",
+              "/ready valida dependências essenciais",
+              "Shutdown encerra conexões sem corromper dados",
+              "Logs permitem rastrear erro por trace_id"
+            ],
+            "edge_cases": [
+              "E se banco cair: /ready retorna 503",
+              "E se variável obrigatória faltar: aplicação falha com mensagem clara",
+              "E se container receber SIGTERM: encerrar filas e conexões com segurança"
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "nome": "Cadastro de pacientes",
+        "descricao": "Implementar cadastro administrativo completo de pacientes com CPF obrigatório e bloqueio de duplicidade.",
+        "entregavel": "CRUD de pacientes com busca rápida, validação de CPF obrigatório, auditoria e histórico administrativo.",
+        "risco": "médio",
+        "pre_requisito": "Sprint 1",
+        "features": [
+          {
+            "categoria": "api_endpoint",
+            "descricao": "Cadastrar paciente com CPF obrigatório",
+            "steps": [
+              "Criar formulário com campos obrigatórios",
+              "Validar CPF obrigatório e formato",
+              "Validar data de nascimento",
+              "Validar telefone/WhatsApp",
+              "Salvar paciente",
+              "Registrar usuário criador e data/hora"
+            ],
+            "acceptance_criteria": [
+              "Paciente sem CPF não é cadastrado",
+              "CPF inválido retorna erro de validação",
+              "CPF novo cria paciente",
+              "CPF existente bloqueia criação com 409"
+            ],
+            "edge_cases": [
+              "E se CPF já existir: retornar 409 com paciente relacionado para conferência autorizada",
+              "E se telefone estiver em outro cadastro: exibir alerta sem bloquear pelo telefone",
+              "E se paciente for menor: exigir responsável",
+              "E se payload exceder limite: retornar 413"
+            ]
+          },
+          {
+            "categoria": "api_endpoint",
+            "descricao": "Editar cadastro de paciente por admin e recepção",
+            "steps": [
+              "Permitir admin e recepção editar qualquer dado cadastral",
+              "Validar CPF em edição",
+              "Impedir CPF duplicado",
+              "Salvar histórico de alteração",
+              "Exibir última atualização no cadastro"
+            ],
+            "acceptance_criteria": [
+              "Recepção consegue editar dados cadastrais",
+              "Admin consegue editar dados cadastrais",
+              "Alteração de CPF para CPF existente é bloqueada",
+              "Toda edição crítica gera log"
+            ],
+            "edge_cases": [
+              "E se dois usuários editarem ao mesmo tempo: aplicar controle de versão/updated_at e retornar 409",
+              "E se usuário sem permissão tentar editar: retornar 403",
+              "E se CPF for removido: bloquear, pois CPF é obrigatório"
+            ]
+          },
+          {
+            "categoria": "frontend",
+            "descricao": "Busca rápida de pacientes",
+            "steps": [
+              "Permitir busca por nome, CPF e telefone",
+              "Exibir resultados com identificação mínima",
+              "Abrir ficha administrativa",
+              "Exibir histórico administrativo de agendamentos"
+            ],
+            "acceptance_criteria": [
+              "Busca responde em até 2 segundos",
+              "Resultado mostra dados suficientes para evitar erro de paciente",
+              "Recepção não vê prontuário",
+              "Médico vê todos os dados do paciente conforme permissão"
+            ],
+            "edge_cases": [
+              "E se não houver resultado: mostrar empty state",
+              "E se houver muitos resultados por nome: paginar",
+              "E se usuário estiver offline: avisar indisponibilidade da busca"
+            ]
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "nome": "Agenda e agendamentos",
+        "descricao": "Criar agenda operacional com horários, bloqueios, encaixes, conflitos, status e pré-agendamentos do bot.",
+        "entregavel": "Agenda funcional para recepção, admin e profissionais, com regras de conflito e status de atendimento.",
+        "risco": "alto",
+        "pre_requisito": "Sprint 2",
+        "features": [
+          {
+            "categoria": "api_endpoint",
+            "descricao": "Criar agendamento pela recepção/admin",
+            "steps": [
+              "Selecionar paciente",
+              "Selecionar profissional",
+              "Selecionar data e horário",
+              "Selecionar tipo de atendimento",
+              "Validar disponibilidade",
+              "Criar agendamento com status inicial",
+              "Registrar origem do agendamento"
+            ],
+            "acceptance_criteria": [
+              "Agendamento válido é criado",
+              "Conflito gera alerta",
+              "Encaixe exige confirmação manual da recepção",
+              "Status inicial fica solicitado ou confirmado conforme fluxo"
+            ],
+            "edge_cases": [
+              "E se horário estiver ocupado: permitir encaixe com confirmação manual",
+              "E se profissional estiver bloqueado: impedir agendamento comum",
+              "E se paciente tiver agendamento no mesmo horário: retornar 409",
+              "E se dois usuários pegarem o mesmo horário simultaneamente: usar transação e constraint de conflito"
+            ]
+          },
+          {
+            "categoria": "api_endpoint",
+            "descricao": "Pré-agendamento criado pelo bot",
+            "steps": [
+              "Receber solicitação do bot/n8n",
+              "Validar dados mínimos do paciente",
+              "Criar pré-agendamento",
+              "Marcar origem como bot/WhatsApp",
+              "Notificar recepção para confirmar",
+              "Somente após confirmação virar agendamento ativo"
+            ],
+            "acceptance_criteria": [
+              "Bot não confirma agendamento final sozinho",
+              "Recepção vê pré-agendamento pendente",
+              "Pré-agendamento aprovado ocupa agenda",
+              "Pré-agendamento recusado registra motivo"
+            ],
+            "edge_cases": [
+              "E se dados do paciente estiverem incompletos: manter solicitação pendente",
+              "E se horário sumir antes da aprovação: pedir novo horário",
+              "E se n8n enviar evento duplicado: idempotência por event_id"
+            ]
+          },
+          {
+            "categoria": "api_endpoint",
+            "descricao": "Cancelar ou remarcar consulta",
+            "steps": [
+              "Permitir recepção/admin cancelar/remarcar",
+              "Permitir cancelamento/remarcação automática pelo WhatsApp até 2h antes",
+              "Bloquear automação após limite",
+              "Registrar motivo quando informado",
+              "Disparar evento para WhatsApp"
+            ],
+            "acceptance_criteria": [
+              "Cancelamento até 2h antes pelo WhatsApp é aceito",
+              "Remarcação até 2h antes pelo WhatsApp é aceita",
+              "Após limite, solicitação vai para recepção",
+              "Histórico registra alteração"
+            ],
+            "edge_cases": [
+              "E se paciente tentar cancelar a menos de 2h: criar pendência para recepção",
+              "E se novo horário estiver ocupado: sugerir alternativa",
+              "E se integração WhatsApp falhar: agendamento continua alterado e mensagem fica pendente"
+            ]
+          },
+          {
+            "categoria": "frontend",
+            "descricao": "Bloqueio/liberação de horários",
+            "steps": [
+              "Profissional visualiza própria agenda",
+              "Profissional bloqueia/libera seus horários",
+              "Admin altera qualquer agenda",
+              "Registrar bloqueios com motivo",
+              "Impedir agendamento comum em horário bloqueado"
+            ],
+            "acceptance_criteria": [
+              "Profissional altera apenas própria agenda",
+              "Admin altera todas",
+              "Recepção visualiza bloqueios",
+              "Alterações geram log"
+            ],
+            "edge_cases": [
+              "E se houver agendamento em horário que será bloqueado: exigir remarcação ou confirmação admin",
+              "E se usuário tentar alterar agenda de outro sem permissão: retornar 403"
+            ]
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "nome": "WhatsApp, confirmações e lembretes",
+        "descricao": "Automatizar confirmação 24h antes, repetição 2h antes, confirmação tardia e histórico de mensagens.",
+        "entregavel": "Fluxo assíncrono de WhatsApp com n8n/Evolution API, retries, pendências e tela de mensagens.",
+        "risco": "alto",
+        "pre_requisito": "Sprint 3",
+        "features": [
+          {
+            "categoria": "integração",
+            "descricao": "Confirmação automática de consulta",
+            "steps": [
+              "Agendar job de confirmação 24h antes",
+              "Enviar mensagem via n8n/Evolution API",
+              "Registrar status da mensagem",
+              "Se não houver resposta, reenviar 2h antes",
+              "Atualizar status conforme resposta do paciente"
+            ],
+            "acceptance_criteria": [
+              "Mensagem 24h antes é disparada",
+              "Mensagem 2h antes é disparada se não houver resposta",
+              "Resposta positiva até 2h antes confirma consulta",
+              "Resposta depois do limite vira confirmação tardia"
+            ],
+            "edge_cases": [
+              "E se Evolution API cair: retry 3x e marcar pendente",
+              "E se n8n retornar erro: marcar falha e avisar recepção",
+              "E se paciente responder depois de 2h antes: marcar confirmação tardia",
+              "E se mensagem duplicar: usar idempotência por message_id/event_id"
+            ]
+          },
+          {
+            "categoria": "integração",
+            "descricao": "Histórico e pendências de WhatsApp",
+            "steps": [
+              "Registrar toda mensagem enviada",
+              "Registrar retorno do n8n",
+              "Registrar número de tentativas",
+              "Exibir pendências na tela da recepção",
+              "Permitir reenvio manual"
+            ],
+            "acceptance_criteria": [
+              "Recepção vê mensagens pendentes",
+              "Reenvio manual funciona",
+              "Falha de WhatsApp não bloqueia agendamento",
+              "Histórico fica vinculado ao paciente/agendamento"
+            ],
+            "edge_cases": [
+              "E se telefone estiver inválido: marcar erro de validação",
+              "E se paciente pedir humano: sinalizar atendimento humano",
+              "E se WhatsApp estiver indisponível: manter fila de envio"
+            ]
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "nome": "Lista de espera e recepção operacional",
+        "descricao": "Organizar lista de espera por prioridade e criar tela principal da recepção.",
+        "entregavel": "Lista de espera priorizada e dashboard operacional do dia.",
+        "risco": "médio",
+        "pre_requisito": "Sprint 3",
+        "features": [
+          {
+            "categoria": "api_endpoint",
+            "descricao": "Lista de espera priorizada",
+            "steps": [
+              "Cadastrar paciente na lista",
+              "Registrar profissional/especialidade desejada",
+              "Registrar prioridade definida pela recepção/admin",
+              "Registrar melhores dias/horários",
+              "Alertar quando abrir vaga",
+              "Recepção confirma antes de agendar"
+            ],
+            "acceptance_criteria": [
+              "Lista ordena por prioridade definida",
+              "Recepção consegue alterar prioridade",
+              "Abertura de vaga gera alerta",
+              "Paciente não é agendado automaticamente sem confirmação"
+            ],
+            "edge_cases": [
+              "E se dois pacientes tiverem mesma prioridade: ordenar por data de entrada",
+              "E se paciente já estiver na lista para mesmo serviço: bloquear duplicidade",
+              "E se paciente recusar vaga: registrar recusa e manter/remover conforme decisão da recepção"
+            ]
+          },
+          {
+            "categoria": "frontend",
+            "descricao": "Tela principal da recepção",
+            "steps": [
+              "Exibir agenda do dia",
+              "Exibir pacientes aguardando",
+              "Exibir confirmações pendentes",
+              "Exibir mensagens WhatsApp pendentes",
+              "Exibir lista de espera",
+              "Permitir filtros por profissional, status e data"
+            ],
+            "acceptance_criteria": [
+              "Recepção vê a operação do dia em uma tela",
+              "Filtros funcionam sem travar",
+              "Estados vazios são claros",
+              "Tela carrega em até 2 segundos em uso comum"
+            ],
+            "edge_cases": [
+              "E se integração WhatsApp falhar: exibir alerta sem quebrar tela",
+              "E se não houver agendamentos: mostrar empty state",
+              "E se houver muitos itens: paginar ou virtualizar lista"
+            ]
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "nome": "Painel de chamada e fluxo de atendimento",
+        "descricao": "Permitir que médico chame paciente e que TV/painel exiba o nome completo do paciente.",
+        "entregavel": "Painel web para TV e botão de chamada na agenda do médico.",
+        "risco": "médio",
+        "pre_requisito": "Sprint 3",
+        "features": [
+          {
+            "categoria": "frontend",
+            "descricao": "Chamada de paciente pelo médico",
+            "steps": [
+              "Médico visualiza pacientes aguardando",
+              "Médico clica em chamar",
+              "Status muda para em atendimento",
+              "Painel exibe nome completo e sala/consultório",
+              "Recepção vê status atualizado"
+            ],
+            "acceptance_criteria": [
+              "Painel mostra nome completo conforme decisão de negócio",
+              "Atualização ocorre em tempo real ou quase real",
+              "Recepção vê horário de chamada",
+              "Chamada gera log"
+            ],
+            "edge_cases": [
+              "E se painel estiver offline: manter status no sistema e avisar médico",
+              "E se paciente errado for chamado: permitir nova chamada e registrar log",
+              "E se houver duas chamadas simultâneas: ordenar por horário de emissão"
+            ]
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "nome": "Relatórios operacionais do MVP",
+        "descricao": "Criar relatórios básicos sem financeiro para gestão da operação.",
+        "entregavel": "Relatórios de agenda do dia, status, pacientes cadastrados no período e origem dos agendamentos.",
+        "risco": "baixo",
+        "pre_requisito": "Sprint 3",
+        "features": [
+          {
+            "categoria": "api_endpoint",
+            "descricao": "Relatórios operacionais básicos",
+            "steps": [
+              "Criar relatório de agenda do dia",
+              "Criar relatório de agendamentos por status",
+              "Criar relatório de pacientes cadastrados no período",
+              "Criar relatório de origem dos agendamentos",
+              "Permitir filtro por data e profissional",
+              "Exportar Excel/PDF para admin"
+            ],
+            "acceptance_criteria": [
+              "Admin acessa relatórios",
+              "Recepção acessa relatórios operacionais autorizados",
+              "Relatórios não exibem conteúdo clínico",
+              "Exportação gera arquivo válido"
+            ],
+            "edge_cases": [
+              "E se período for muito grande: limitar ou processar assíncrono",
+              "E se não houver dados: retornar relatório vazio claro",
+              "E se usuário sem permissão exportar: retornar 403"
+            ]
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "nome": "Fase 2 — Prontuário, documentos e IA assistiva",
+        "descricao": "Preparar e implementar módulo clínico após estabilização de agenda/WhatsApp/recepção.",
+        "entregavel": "Prontuário estruturado, documentos médicos, consentimentos e IA assistiva com aprovação obrigatória do médico.",
+        "risco": "alto",
+        "pre_requisito": "MVP operacional aprovado",
+        "features": [
+          {
+            "categoria": "database",
+            "descricao": "Prontuário estruturado com histórico preservado",
+            "steps": [
+              "Criar prontuário por paciente",
+              "Criar evolução vinculada ao atendimento",
+              "Registrar profissional responsável",
+              "Impedir exclusão definitiva",
+              "Permitir adendo/retificação com histórico",
+              "Registrar todo acesso e alteração"
+            ],
+            "acceptance_criteria": [
+              "Recepção não acessa prontuário",
+              "Médico acessa dados clínicos autorizados",
+              "Alterações preservam versão anterior",
+              "Logs registram visualização e alteração"
+            ],
+            "edge_cases": [
+              "E se usuário sem permissão tentar acessar: retornar 403",
+              "E se evolução for retificada: manter versão anterior",
+              "E se banco falhar durante salvamento: transação rollback"
+            ]
+          },
+          {
+            "categoria": "ia_agent",
+            "descricao": "IA assistiva para apoio clínico com aprovação médica obrigatória",
+            "steps": [
+              "Criar AI Gateway",
+              "Versionar prompts",
+              "Permitir resumo, hipóteses, conduta e orientações",
+              "Exigir revisão/aprovação médica",
+              "Registrar provedor, modelo, prompt e aprovação",
+              "Impedir envio/finalização automática sem médico"
+            ],
+            "acceptance_criteria": [
+              "IA nunca finaliza conduta sozinha",
+              "Médico precisa aprovar conteúdo",
+              "Uso de IA gera log",
+              "Falha de IA não bloqueia atendimento"
+            ],
+            "edge_cases": [
+              "E se modelo estiver indisponível: tentar fallback ou avisar indisponibilidade",
+              "E se resposta vier vazia: não salvar como sugestão válida",
+              "E se conteúdo exceder limite de tokens: resumir ou pedir recorte",
+              "E se dado sensível não for necessário: não enviar ao provedor"
+            ]
+          },
+          {
+            "categoria": "api_endpoint",
+            "descricao": "Documentos médicos e PDFs",
+            "steps": [
+              "Gerar atestado, receita simples, pedido de exame e orientações",
+              "Aplicar identidade visual da Clínica Vida",
+              "Exigir profissional autorizado",
+              "Gerar PDF",
+              "Registrar documento gerado",
+              "Permitir impressão/download autorizado"
+            ],
+            "acceptance_criteria": [
+              "Documento médico só é gerado por perfil autorizado",
+              "PDF abre corretamente",
+              "Geração gera log",
+              "Recepção não acessa documentos clínicos sensíveis sem permissão"
+            ],
+            "edge_cases": [
+              "E se template estiver indisponível: mostrar erro claro",
+              "E se usuário não médico tentar receita/atestado: retornar 403",
+              "E se PDF falhar: manter rascunho e permitir nova tentativa"
+            ]
+          }
+        ]
+      }
+    ],
+    "modelo_dados": {
+      "pacientes": {
+        "campos_obrigatorios": [
+          "id",
+          "nome_completo",
+          "cpf",
+          "data_nascimento",
+          "telefone_whatsapp"
+        ],
+        "constraints": [
+          "cpf unique not null",
+          "soft delete quando aplicável",
+          "updated_at para controle de concorrência"
+        ]
+      },
+      "agendamentos": {
+        "campos_obrigatorios": [
+          "id",
+          "paciente_id",
+          "profissional_id",
+          "data_hora_inicio",
+          "data_hora_fim",
+          "status",
+          "origem"
+        ],
+        "statuses": [
+          "solicitado",
+          "pre_agendamento",
+          "confirmado",
+          "confirmacao_tardia",
+          "aguardando",
+          "em_atendimento",
+          "atendido",
+          "faltou",
+          "cancelado"
+        ],
+        "constraints": [
+          "evitar conflito por profissional/horário salvo encaixe confirmado",
+          "histórico de alterações obrigatório"
+        ]
+      },
+      "mensagens_whatsapp": {
+        "campos_obrigatorios": [
+          "id",
+          "paciente_id",
+          "agendamento_id",
+          "tipo",
+          "status",
+          "tentativas",
+          "event_id"
+        ],
+        "statuses": [
+          "pendente",
+          "enviada",
+          "entregue",
+          "respondida",
+          "falha",
+          "cancelada"
+        ],
+        "constraints": [
+          "event_id unique para idempotência"
+        ]
+      },
+      "auditoria": {
+        "campos_obrigatorios": [
+          "id",
+          "usuario_id",
+          "acao",
+          "entidade",
+          "registro_id",
+          "data_hora",
+          "ip_dispositivo",
+          "resultado",
+          "trace_id"
+        ]
+      }
+    },
+    "definition_of_done": [
+      "Feature implementada com steps verificáveis concluídos",
+      "Validação de input aplicada",
+      "Status codes e schema padrão aplicados",
+      "Logs e auditoria nas ações críticas",
+      "Permissões testadas por perfil",
+      "Edge cases principais cobertos",
+      "Testes mínimos de sucesso, erro e permissão",
+      "Documentação de variáveis de ambiente e integrações atualizada",
+      "Deploy validado em homologação antes da produção"
+    ]
+  }
+}
