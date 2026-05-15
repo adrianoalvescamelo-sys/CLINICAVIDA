@@ -39,6 +39,59 @@ export class RecepcaoService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Painel TV — exibe chamada atual + próximos 3 da fila.
+   * Endpoint público interno (autenticado via TvAuthGuard).
+   * Nome completo sem truncamento (CLAUDE.md: "Painel TV exibe nome completo").
+   */
+  async painelTV(data?: string) {
+    const dataAlvo = data ?? this.todayInClinicTimezone();
+    const { start, end } = this.dayRange(dataAlvo);
+
+    const selectResumido = {
+      id: true,
+      dataHoraInicio: true,
+      paciente: { select: { nomeCompleto: true } },
+      profissional: { select: { nomeCompleto: true } },
+    } satisfies Prisma.AgendamentoSelect;
+
+    const [chamadoAgora, proximos] = await this.prisma.$transaction([
+      this.prisma.agendamento.findFirst({
+        where: {
+          dataHoraInicio: { gte: start, lt: end },
+          status: AgendamentoStatus.EM_ATENDIMENTO,
+        },
+        select: selectResumido,
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.agendamento.findMany({
+        where: {
+          dataHoraInicio: { gte: start, lt: end },
+          status: AgendamentoStatus.AGUARDANDO,
+        },
+        select: selectResumido,
+        orderBy: { dataHoraInicio: 'asc' },
+        take: 3,
+      }),
+    ]);
+
+    return {
+      chamadoAgora,
+      proximos,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  private todayInClinicTimezone(): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: CLINIC_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    return parts;
+  }
+
   async dashboard(query: QueryDashboardDto) {
     const { start, end } = this.dayRange(query.data);
     const dayWhere = this.agendamentoWhere(query, start, end);

@@ -53,7 +53,10 @@ export class RelatoriosController {
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ) {
-    return this.relatorios.agendaDia(dto, await this.ctx(req, user));
+    const ctx = await this.ctx(req, user);
+    const data = await this.relatorios.agendaDia(dto, ctx);
+    await this.auditAcesso('agenda-dia', ctx, { data: dto.data });
+    return data;
   }
 
   // ---------------------------------------------------------------------------
@@ -72,10 +75,13 @@ export class RelatoriosController {
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ) {
-    return this.relatorios.agendamentosPorStatus(
-      dto,
-      await this.ctx(req, user),
-    );
+    const ctx = await this.ctx(req, user);
+    const data = await this.relatorios.agendamentosPorStatus(dto, ctx);
+    await this.auditAcesso('agendamentos-status', ctx, {
+      inicio: dto.inicio,
+      fim: dto.fim,
+    });
+    return data;
   }
 
   // ---------------------------------------------------------------------------
@@ -89,7 +95,13 @@ export class RelatoriosController {
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ) {
-    return this.relatorios.pacientesCadastrados(dto, await this.ctx(req, user));
+    const ctx = await this.ctx(req, user);
+    const data = await this.relatorios.pacientesCadastrados(dto, ctx);
+    await this.auditAcesso('pacientes-periodo', ctx, {
+      inicio: dto.inicio,
+      fim: dto.fim,
+    });
+    return data;
   }
 
   // ---------------------------------------------------------------------------
@@ -108,7 +120,13 @@ export class RelatoriosController {
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ) {
-    return this.relatorios.origemAgendamentos(dto, await this.ctx(req, user));
+    const ctx = await this.ctx(req, user);
+    const data = await this.relatorios.origemAgendamentos(dto, ctx);
+    await this.auditAcesso('origem', ctx, {
+      inicio: dto.inicio,
+      fim: dto.fim,
+    });
+    return data;
   }
 
   // ---------------------------------------------------------------------------
@@ -363,6 +381,23 @@ export class RelatoriosController {
       resultado,
       traceId: ctx.traceId,
       detalhes: { relatorio, formato },
+    });
+  }
+
+  private async auditAcesso(
+    relatorio: string,
+    ctx: CallerCtx,
+    filtros: Record<string, unknown>,
+  ) {
+    await this.audit.log({
+      usuarioId: ctx.usuarioId,
+      acao: 'ACESSO_RELATORIO',
+      entidade: 'Relatorio',
+      registroId: null,
+      ipDispositivo: ctx.ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: ctx.traceId,
+      detalhes: { relatorio, ...filtros },
     });
   }
 }

@@ -40,6 +40,7 @@ setEnvIfMissing('AUTH_LOCKOUT_MINUTES', '15');
 // Segurança
 setEnvIfMissing('CORS_ORIGIN', 'http://localhost:3001');
 setEnvIfMissing('BOT_SECRET', 'test-bot-secret-clinicavida-2026-devonly');
+setEnvIfMissing('TV_SECRET', 'test-tv-secret-clinicavida-2026-devonly');
 
 // Log silencioso em testes
 setEnvIfMissing('LOG_LEVEL', 'silent');

@@ -260,6 +260,8 @@ export class WhatsappService {
 
     if (!novoStatus) return;
 
+    const traceId = uuid();
+
     await this.prisma.agendamento.update({
       where: { id: agendamentoId },
       data: {
@@ -288,7 +290,27 @@ export class WhatsappService {
         statusAnterior: ag.status,
         statusNovo: novoStatus,
         diff: { origem: 'WHATSAPP', resposta: texto } as Prisma.InputJsonValue,
-        traceId: uuid(),
+        traceId,
+      },
+    });
+
+    const acao =
+      novoStatus === AgendamentoStatus.CANCELADO
+        ? 'AGENDAMENTO_CANCELADO_WHATSAPP'
+        : 'AGENDAMENTO_CONFIRMADO_WHATSAPP';
+
+    await this.audit.log({
+      usuarioId: null,
+      acao,
+      entidade: 'Agendamento',
+      registroId: agendamentoId,
+      ipDispositivo: 'whatsapp',
+      resultado: AuditResultado.SUCESSO,
+      traceId,
+      detalhes: {
+        statusAnterior: ag.status,
+        statusNovo: novoStatus,
+        resposta: texto,
       },
     });
   }
