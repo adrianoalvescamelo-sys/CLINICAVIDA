@@ -68,6 +68,13 @@ export class BotService {
       where: { cpf: dto.cpf },
     });
     if (existente && !existente.deletedAt) return existente;
+    if (existente && existente.deletedAt) {
+      throw new BadRequestException({
+        code: 'PACIENTE_INATIVO',
+        message:
+          'Paciente com este CPF está inativo. Entre em contato com a recepção.',
+      });
+    }
 
     if (!dto.nomeCompleto || !dto.telefoneWhatsapp || !dto.dataNascimento) {
       throw new BadRequestException({

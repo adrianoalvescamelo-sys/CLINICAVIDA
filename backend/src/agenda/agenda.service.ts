@@ -86,7 +86,7 @@ export class AgendaService {
 
     const status = opt.statusInicial ?? AgendamentoStatus.SOLICITADO;
 
-    return this.prisma.$transaction(async (tx) => {
+    const ag = await this.prisma.$transaction(async (tx) => {
       const conflito = await tx.agendamento.findFirst({
         where: {
           profissionalId: dto.profissionalId,
@@ -167,6 +167,23 @@ export class AgendaService {
 
       return ag;
     });
+
+    // Bot passes paciente.id as usuarioId (not a valid Usuario FK) — use null
+    const auditUserId =
+      opt.origem === AgendamentoOrigem.BOT_WHATSAPP ? null : ctx.usuarioId;
+
+    await this.audit.log({
+      usuarioId: auditUserId,
+      acao: 'CREATE',
+      entidade: 'Agendamento',
+      registroId: ag.id,
+      ipDispositivo: ctx.ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: ctx.traceId,
+      detalhes: { origem: opt.origem, status },
+    });
+
+    return ag;
   }
 
   findAll(query: QueryAgendamentosDto) {
@@ -245,16 +262,12 @@ export class AgendaService {
       : atual.dataHoraFim;
     const novoProfId = dto.profissionalId ?? atual.profissionalId;
 
-    if (
-      dto.dataHoraInicio ||
-      dto.dataHoraFim ||
-      (dto.profissionalId && dto.profissionalId !== atual.profissionalId)
-    ) {
-      this.validarIntervalo(novoInicio, novoFim);
-
+    // Valida limite de 2h para cancelamento ou remarcação automática via bot/WhatsApp.
+    // A verificação acontece antes do bloco de mudança de datas para cobrir o caso
+    // de cancelamento puro (sem alteração de horário).
+    if (origemAlteracao === AgendamentoOrigem.PACIENTE_WHATSAPP) {
       const isAutoCancelOuRemarc =
-        origemAlteracao === AgendamentoOrigem.PACIENTE_WHATSAPP &&
-        (novoStatus === AgendamentoStatus.CANCELADO || !!dto.dataHoraInicio);
+        novoStatus === AgendamentoStatus.CANCELADO || !!dto.dataHoraInicio;
       if (isAutoCancelOuRemarc) {
         const horasAte =
           (atual.dataHoraInicio.getTime() - Date.now()) / 3_600_000;
@@ -266,6 +279,14 @@ export class AgendaService {
           });
         }
       }
+    }
+
+    if (
+      dto.dataHoraInicio ||
+      dto.dataHoraFim ||
+      (dto.profissionalId && dto.profissionalId !== atual.profissionalId)
+    ) {
+      this.validarIntervalo(novoInicio, novoFim);
 
       const conflito = await this.prisma.agendamento.findFirst({
         where: {
@@ -382,7 +403,7 @@ export class AgendaService {
       });
     }
 
-    return this.prisma.bloqueioAgenda.create({
+    const bloqueio = await this.prisma.bloqueioAgenda.create({
       data: {
         profissionalId: dto.profissionalId,
         dataHoraInicio: inicio,
@@ -391,6 +412,18 @@ export class AgendaService {
         criadoPor: ctx.usuarioId,
       },
     });
+
+    await this.audit.log({
+      usuarioId: ctx.usuarioId,
+      acao: 'CREATE',
+      entidade: 'BloqueioAgenda',
+      registroId: bloqueio.id,
+      ipDispositivo: ctx.ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: ctx.traceId,
+    });
+
+    return bloqueio;
   }
 
   async listarBloqueios(profissionalId?: string) {
@@ -422,6 +455,16 @@ export class AgendaService {
       });
     }
     await this.prisma.bloqueioAgenda.delete({ where: { id } });
+
+    await this.audit.log({
+      usuarioId: ctx.usuarioId,
+      acao: 'DELETE',
+      entidade: 'BloqueioAgenda',
+      registroId: id,
+      ipDispositivo: ctx.ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: ctx.traceId,
+    });
   }
 
   private validarIntervalo(inicio: Date, fim: Date) {

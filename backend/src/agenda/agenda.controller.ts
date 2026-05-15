@@ -60,6 +60,11 @@ export class AgendaController {
     return this.agenda.findAll(q);
   }
 
+  @Get('bloqueios')
+  listarBloqueios(@Query('profissionalId') profissionalId?: string) {
+    return this.agenda.listarBloqueios(profissionalId);
+  }
+
   @Get(':id')
   findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.agenda.findOne(id);
@@ -77,6 +82,7 @@ export class AgendaController {
   }
 
   @Post(':id/chamar')
+  @HttpCode(HttpStatus.OK)
   @Roles(
     PerfilTipo.MEDICO,
     PerfilTipo.PROFISSIONAL_NAO_MEDICO,
@@ -91,6 +97,7 @@ export class AgendaController {
   }
 
   @Post(':id/atendido')
+  @HttpCode(HttpStatus.OK)
   @Roles(
     PerfilTipo.MEDICO,
     PerfilTipo.PROFISSIONAL_NAO_MEDICO,
@@ -105,6 +112,7 @@ export class AgendaController {
   }
 
   @Post(':id/falta')
+  @HttpCode(HttpStatus.OK)
   @Roles(PerfilTipo.RECEPCAO, PerfilTipo.ADMIN)
   falta(
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -127,11 +135,6 @@ export class AgendaController {
   ) {
     const profId = await this.profissionalDoUser(user.id);
     return this.agenda.criarBloqueio(dto, this.ctx(req, user), profId);
-  }
-
-  @Get('bloqueios')
-  listarBloqueios(@Query('profissionalId') profissionalId?: string) {
-    return this.agenda.listarBloqueios(profissionalId);
   }
 
   @Delete('bloqueios/:id')
