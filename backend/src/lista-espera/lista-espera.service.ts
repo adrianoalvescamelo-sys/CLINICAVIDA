@@ -213,7 +213,7 @@ export class ListaEsperaService {
     if (!item) {
       throw new NotFoundException({
         code: 'LISTA_ESPERA_NAO_ENCONTRADA',
-        message: 'Item da lista de espera nÃ£o encontrado',
+        message: 'Item da lista de espera não encontrado',
       });
     }
     return item;
@@ -227,7 +227,7 @@ export class ListaEsperaService {
     if (!paciente) {
       throw new NotFoundException({
         code: 'PACIENTE_NAO_ENCONTRADO',
-        message: 'Paciente nÃ£o encontrado',
+        message: 'Paciente não encontrado',
       });
     }
   }
@@ -241,7 +241,7 @@ export class ListaEsperaService {
     if (!profissional || !profissional.ativo) {
       throw new NotFoundException({
         code: 'PROFISSIONAL_NAO_ENCONTRADO',
-        message: 'Profissional nÃ£o encontrado ou inativo',
+        message: 'Profissional não encontrado ou inativo',
       });
     }
   }

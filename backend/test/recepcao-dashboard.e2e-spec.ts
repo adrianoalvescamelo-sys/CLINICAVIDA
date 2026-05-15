@@ -205,7 +205,8 @@ describe('RecepcaoDashboard (e2e)', () => {
   it('retorna arrays vazios e generatedAt para data sem fixtures', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/recepcao/dashboard')
-      .query({ data: emptyDate })
+      // Filtra por profissionalId para garantir isolamento contra outros testes paralelos
+      .query({ data: emptyDate, profissionalId })
       .set('Authorization', `Bearer ${recepcaoToken}`)
       .expect(200);
 

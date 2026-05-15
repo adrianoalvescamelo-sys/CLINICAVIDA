@@ -319,7 +319,7 @@ describe('Relatorios (e2e)', () => {
     it('admin recebe lista de pacientes', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/relatorios/pacientes-periodo')
-        .query({ inicio: '2026-01-01', fim: '2026-12-31' })
+        .query({ inicio: '2026-04-16', fim: '2026-07-14' })
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
@@ -331,7 +331,7 @@ describe('Relatorios (e2e)', () => {
     it('recepção acessa relatório de pacientes', async () => {
       await request(app.getHttpServer())
         .get('/api/relatorios/pacientes-periodo')
-        .query({ inicio: '2026-01-01', fim: '2026-12-31' })
+        .query({ inicio: '2026-04-16', fim: '2026-07-14' })
         .set('Authorization', `Bearer ${recepcaoToken}`)
         .expect(200);
     });
@@ -496,7 +496,7 @@ describe('Relatorios (e2e)', () => {
     it('admin gera pdf de pacientes', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/relatorios/export/pacientes/pdf')
-        .query({ inicio: '2026-01-01', fim: '2026-12-31' })
+        .query({ inicio: '2026-04-16', fim: '2026-07-14' })
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 

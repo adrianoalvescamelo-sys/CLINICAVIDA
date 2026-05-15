@@ -100,6 +100,13 @@ describe('ListaEspera (e2e)', () => {
     medicoToken = await login(emails.medico);
   });
 
+  afterEach(async () => {
+    // Remove itens de lista de espera deste paciente de teste para não vazar entre suites paralelas
+    await prisma.listaEspera.deleteMany({
+      where: { paciente: { cpf: '91000000001' } },
+    });
+  });
+
   afterAll(async () => {
     await cleanup();
     await app.close();
@@ -146,6 +153,7 @@ describe('ListaEspera (e2e)', () => {
 
     const res = await request(app.getHttpServer())
       .get('/api/lista-espera')
+      .query({ profissionalId })
       .set('Authorization', `Bearer ${recepcaoToken}`)
       .expect(200);
 

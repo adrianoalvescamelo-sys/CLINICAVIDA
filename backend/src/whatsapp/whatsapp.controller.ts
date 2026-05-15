@@ -58,6 +58,7 @@ export class WhatsappController {
   }
 
   @Post('whatsapp/:id/reenviar')
+  @HttpCode(HttpStatus.OK)
   @Roles(PerfilTipo.ADMIN, PerfilTipo.RECEPCAO)
   reenviar(
     @Param('id', new ParseUUIDPipe()) id: string,

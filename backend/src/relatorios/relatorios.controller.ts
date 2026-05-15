@@ -21,6 +21,7 @@ import {
 } from '../common/decorators/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { SkipResponseInterceptor } from '../common/decorators/skip-response-interceptor.decorator';
 
 /** Perfis que exigem vínculo com um registro de Profissional. */
 const PERFIS_PROFISSIONAL = new Set<PerfilTipo>([
@@ -116,6 +117,7 @@ export class RelatoriosController {
 
   @Get('export/agenda-dia/xlsx')
   @Roles(PerfilTipo.ADMIN)
+  @SkipResponseInterceptor()
   async exportAgendaDiaXlsx(
     @Query() dto: QueryAgendaDiaDto,
     @CurrentUser() user: AuthUser,
@@ -135,6 +137,7 @@ export class RelatoriosController {
 
   @Get('export/agendamentos-status/xlsx')
   @Roles(PerfilTipo.ADMIN)
+  @SkipResponseInterceptor()
   async exportStatusXlsx(
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
@@ -168,6 +171,7 @@ export class RelatoriosController {
 
   @Get('export/pacientes/xlsx')
   @Roles(PerfilTipo.ADMIN)
+  @SkipResponseInterceptor()
   async exportPacientesXlsx(
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
@@ -187,6 +191,7 @@ export class RelatoriosController {
 
   @Get('export/origem/xlsx')
   @Roles(PerfilTipo.ADMIN)
+  @SkipResponseInterceptor()
   async exportOrigemXlsx(
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
@@ -210,6 +215,7 @@ export class RelatoriosController {
 
   @Get('export/agenda-dia/pdf')
   @Roles(PerfilTipo.ADMIN)
+  @SkipResponseInterceptor()
   async exportAgendaDiaPdf(
     @Query() dto: QueryAgendaDiaDto,
     @CurrentUser() user: AuthUser,
@@ -229,6 +235,7 @@ export class RelatoriosController {
 
   @Get('export/agendamentos-status/pdf')
   @Roles(PerfilTipo.ADMIN)
+  @SkipResponseInterceptor()
   async exportStatusPdf(
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
@@ -262,6 +269,7 @@ export class RelatoriosController {
 
   @Get('export/pacientes/pdf')
   @Roles(PerfilTipo.ADMIN)
+  @SkipResponseInterceptor()
   async exportPacientesPdf(
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
@@ -281,6 +289,7 @@ export class RelatoriosController {
 
   @Get('export/origem/pdf')
   @Roles(PerfilTipo.ADMIN)
+  @SkipResponseInterceptor()
   async exportOrigemPdf(
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
