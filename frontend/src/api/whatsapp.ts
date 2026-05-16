@@ -6,9 +6,18 @@ interface Env<T> {
   data: T;
 }
 
-export async function listPendentes(): Promise<MensagemWhatsapp[]> {
-  const { data } = await api.get<Env<MensagemWhatsapp[]>>(
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
+export async function listPendentes(params?: {
+  cursor?: string;
+  limit?: number;
+}): Promise<CursorPage<MensagemWhatsapp>> {
+  const { data } = await api.get<Env<CursorPage<MensagemWhatsapp>>>(
     '/whatsapp/pendentes',
+    { params },
   );
   return data.data;
 }

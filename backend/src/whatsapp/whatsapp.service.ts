@@ -13,6 +13,10 @@ import {
 import { v4 as uuid } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import {
+  paginateCursor,
+  resolveTake,
+} from '../common/pagination/cursor.dto';
 
 interface EnfileirarOpts {
   agendamentoId?: string;
@@ -357,8 +361,8 @@ export class WhatsappService {
     });
   }
 
-  listarPendentes() {
-    return this.prisma.mensagemWhatsapp.findMany({
+  async listarPendentes(opts: { cursor?: string; limit?: number } = {}) {
+    const rows = await this.prisma.mensagemWhatsapp.findMany({
       where: {
         status: { in: [MensagemStatus.PENDENTE, MensagemStatus.FALHA] },
         direcao: MensagemDirecao.OUTBOUND,
@@ -369,9 +373,13 @@ export class WhatsappService {
           select: { id: true, dataHoraInicio: true, status: true },
         },
       },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
+      // tie-breaker estável por id para cursor pagination
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: resolveTake(opts.limit),
+      cursor: opts.cursor ? { id: opts.cursor } : undefined,
+      skip: opts.cursor ? 1 : 0,
     });
+    return paginateCursor(rows, opts.limit);
   }
 
   async reenviarManual(id: string, usuarioId: string, traceId: string) {

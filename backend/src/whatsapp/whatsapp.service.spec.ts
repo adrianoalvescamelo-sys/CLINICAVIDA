@@ -1004,7 +1004,7 @@ describe('WhatsappService', () => {
 
       const result = await service.listarPendentes();
 
-      expect(result).toEqual(pendentes);
+      expect(result).toEqual({ items: pendentes, nextCursor: null });
       expect(prisma.mensagemWhatsapp.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -1030,20 +1030,52 @@ describe('WhatsappService', () => {
       );
     });
 
-    it('retorna lista vazia quando não há pendências', async () => {
+    it('retorna página vazia quando não há pendências', async () => {
       prisma.mensagemWhatsapp.findMany.mockResolvedValue([]);
 
       const result = await service.listarPendentes();
-      expect(result).toHaveLength(0);
+      expect(result.items).toHaveLength(0);
+      expect(result.nextCursor).toBeNull();
     });
 
-    it('limita a 100 resultados', async () => {
+    it('default limit 50: take = 51 e nextCursor null quando rows ≤ 50', async () => {
       prisma.mensagemWhatsapp.findMany.mockResolvedValue([]);
 
       await service.listarPendentes();
 
       expect(prisma.mensagemWhatsapp.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 100 }),
+        expect.objectContaining({
+          take: 51,
+          skip: 0,
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        }),
+      );
+    });
+
+    it('paginação: rows > limit → nextCursor preenchido com último id', async () => {
+      const rows = Array.from({ length: 51 }, (_, i) =>
+        makeMensagem({ id: `11111111-1111-4111-8111-${String(i).padStart(12, '0')}` }),
+      );
+      prisma.mensagemWhatsapp.findMany.mockResolvedValue(rows);
+
+      const result = await service.listarPendentes();
+
+      expect(result.items).toHaveLength(50);
+      expect(result.nextCursor).toBe(rows[49].id);
+    });
+
+    it('paginação: cursor recebido aciona skip 1', async () => {
+      prisma.mensagemWhatsapp.findMany.mockResolvedValue([]);
+      const cursor = '99999999-9999-4999-8999-999999999999';
+
+      await service.listarPendentes({ cursor, limit: 10 });
+
+      expect(prisma.mensagemWhatsapp.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cursor: { id: cursor },
+          skip: 1,
+          take: 11,
+        }),
       );
     });
   });

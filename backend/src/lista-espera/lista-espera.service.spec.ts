@@ -272,18 +272,60 @@ describe('ListaEsperaService', () => {
   // ═════════════════════════════════════════════════════════════════════════
 
   describe('findAll', () => {
-    it('sem filtro: usa status ATIVO como default e retorna lista', async () => {
+    it('sem filtro: usa status ATIVO como default e retorna página', async () => {
       const items = [makeListaEsperaDb()];
       prisma.listaEspera.findMany.mockResolvedValue(items);
 
       const result = await service.findAll({} as any);
 
-      expect(result).toEqual(items);
+      expect(result).toEqual({ items, nextCursor: null });
       expect(prisma.listaEspera.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ status: ListaEsperaStatus.ATIVO }),
-          orderBy: [{ prioridade: 'desc' }, { createdAt: 'asc' }],
-          take: 500,
+          orderBy: [
+            { prioridade: 'desc' },
+            { createdAt: 'asc' },
+            { id: 'asc' },
+          ],
+          take: 51,
+        }),
+      );
+    });
+
+    it('paginação: retorna nextCursor quando page cheia', async () => {
+      // limit default 50; mock retorna 51 itens (limit+1) para simular página cheia
+      const rows = Array.from({ length: 51 }, (_, i) =>
+        makeListaEsperaDb({ id: `cccccccc-cccc-4ccc-8ccc-${String(i).padStart(12, '0')}` }),
+      );
+      prisma.listaEspera.findMany.mockResolvedValue(rows);
+
+      const result = await service.findAll({} as any);
+
+      expect(result.items).toHaveLength(50);
+      expect(result.nextCursor).toBe(rows[49].id);
+    });
+
+    it('paginação: respeita limit customizado e clamp ao MAX', async () => {
+      prisma.listaEspera.findMany.mockResolvedValue([]);
+
+      await service.findAll({ limit: 10 } as any);
+
+      expect(prisma.listaEspera.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 11 }),
+      );
+    });
+
+    it('paginação: cursor passado aciona skip 1', async () => {
+      prisma.listaEspera.findMany.mockResolvedValue([]);
+      const cursor = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+      await service.findAll({ cursor, limit: 20 } as any);
+
+      expect(prisma.listaEspera.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cursor: { id: cursor },
+          skip: 1,
+          take: 21,
         }),
       );
     });
@@ -340,12 +382,13 @@ describe('ListaEsperaService', () => {
       );
     });
 
-    it('empty state: retorna array vazio quando não há dados', async () => {
+    it('empty state: retorna página vazia quando não há dados', async () => {
       prisma.listaEspera.findMany.mockResolvedValue([]);
 
       const result = await service.findAll({} as any);
 
-      expect(result).toHaveLength(0);
+      expect(result.items).toHaveLength(0);
+      expect(result.nextCursor).toBeNull();
     });
   });
 

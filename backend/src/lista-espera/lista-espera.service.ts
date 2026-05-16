@@ -7,6 +7,10 @@ import { AuditResultado, ListaEsperaStatus, Prisma } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  paginateCursor,
+  resolveTake,
+} from '../common/pagination/cursor.dto';
 import { CreateListaEsperaDto } from './dto/create-lista-espera.dto';
 import { QueryListaEsperaDto } from './dto/query-lista-espera.dto';
 import {
@@ -80,7 +84,7 @@ export class ListaEsperaService {
     return item;
   }
 
-  findAll(query: QueryListaEsperaDto) {
+  async findAll(query: QueryListaEsperaDto) {
     const where: Prisma.ListaEsperaWhereInput = {
       status: query.status ?? ListaEsperaStatus.ATIVO,
     };
@@ -94,12 +98,21 @@ export class ListaEsperaService {
       };
     }
 
-    return this.prisma.listaEspera.findMany({
+    const rows = await this.prisma.listaEspera.findMany({
       where,
       include: this.includeResumo,
-      orderBy: [{ prioridade: 'desc' }, { createdAt: 'asc' }],
-      take: 500,
+      // `id` no final do orderBy garante ordem total estável → cursor confiável
+      orderBy: [
+        { prioridade: 'desc' },
+        { createdAt: 'asc' },
+        { id: 'asc' },
+      ],
+      take: resolveTake(query.limit),
+      cursor: query.cursor ? { id: query.cursor } : undefined,
+      skip: query.cursor ? 1 : 0,
     });
+
+    return paginateCursor(rows, query.limit);
   }
 
   async update(id: string, dto: UpdateListaEsperaDto, ctx: CallerCtx) {
