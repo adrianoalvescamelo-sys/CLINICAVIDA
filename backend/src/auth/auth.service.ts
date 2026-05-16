@@ -12,6 +12,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuditResultado } from '@prisma/client';
 
+function parseDurationMs(duration: string): number {
+  const num = parseInt(duration, 10);
+  if (duration.endsWith('d')) return num * 24 * 60 * 60 * 1000;
+  if (duration.endsWith('h')) return num * 60 * 60 * 1000;
+  if (duration.endsWith('m')) return num * 60 * 1000;
+  if (duration.endsWith('s')) return num * 1000;
+  return num;
+}
+
 export interface TokenPair {
   access_token: string;
   refresh_token: string;
@@ -66,8 +75,7 @@ export class AuthService {
 
     // persist SHA-256 hash — never plaintext
     const tokenHash = this.hashToken(refresh_token);
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-    const expiresAt = new Date(Date.now() + SEVEN_DAYS_MS);
+    const expiresAt = new Date(Date.now() + parseDurationMs(refreshExpiresIn));
 
     await this.prisma.refreshToken.create({
       data: {
@@ -304,8 +312,9 @@ export class AuthService {
       );
 
       const newHash = this.hashToken(refresh_token);
-      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-      const newExpiresAt = new Date(Date.now() + SEVEN_DAYS_MS);
+      const newExpiresAt = new Date(
+        Date.now() + parseDurationMs(refreshExpiresIn),
+      );
 
       const newRecord = await tx.refreshToken.create({
         data: {

@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, PerfilTipo } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreatePacienteDto } from './dto/create-paciente.dto';
@@ -116,7 +116,7 @@ export class PacientesService {
     return { total, pagina, limite, itens };
   }
 
-  async findOne(id: string) {
+  private async findOneRecord(id: string) {
     const paciente = await this.prisma.paciente.findFirst({
       where: { id, deletedAt: null },
     });
@@ -129,6 +129,29 @@ export class PacientesService {
     return paciente;
   }
 
+  async findOne(id: string, perfil?: PerfilTipo) {
+    const paciente = await this.findOneRecord(id);
+    if (perfil === PerfilTipo.PROFISSIONAL_NAO_MEDICO) {
+      const {
+        id: pid,
+        nomeCompleto,
+        dataNascimento,
+        sexo,
+        telefoneWhatsapp,
+        updatedAt,
+      } = paciente;
+      return {
+        id: pid,
+        nomeCompleto,
+        dataNascimento,
+        sexo,
+        telefoneWhatsapp,
+        updatedAt,
+      };
+    }
+    return paciente;
+  }
+
   async update(
     id: string,
     dto: UpdatePacienteDto,
@@ -136,7 +159,7 @@ export class PacientesService {
     ip: string,
     traceId: string,
   ) {
-    const atual = await this.findOne(id);
+    const atual = await this.findOneRecord(id);
 
     if (dto.updatedAt) {
       const sent = new Date(dto.updatedAt).getTime();
@@ -215,7 +238,7 @@ export class PacientesService {
   }
 
   async softDelete(id: string, usuarioId: string, ip: string, traceId: string) {
-    await this.findOne(id);
+    await this.findOneRecord(id);
     await this.prisma.paciente.update({
       where: { id },
       data: { deletedAt: new Date(), atualizadoPor: usuarioId },
@@ -233,7 +256,7 @@ export class PacientesService {
   }
 
   async historico(pacienteId: string) {
-    await this.findOne(pacienteId);
+    await this.findOneRecord(pacienteId);
     return this.prisma.pacienteHistorico.findMany({
       where: { pacienteId },
       orderBy: { createdAt: 'desc' },

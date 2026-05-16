@@ -17,7 +17,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await login(email, senha);
-      setSession(res.access_token, res.usuario);
+      setSession(res.access_token, res.refresh_token, res.usuario);
       navigate('/');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message ?? 'Falha ao entrar';

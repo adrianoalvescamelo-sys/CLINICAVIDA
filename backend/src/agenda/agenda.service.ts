@@ -186,9 +186,26 @@ export class AgendaService {
     return ag;
   }
 
-  findAll(query: QueryAgendamentosDto) {
+  async findAll(
+    query: QueryAgendamentosDto,
+    callerCtx?: { perfil: PerfilTipo; profissionalId?: string },
+  ) {
+    const restricted =
+      callerCtx?.perfil === PerfilTipo.MEDICO ||
+      callerCtx?.perfil === PerfilTipo.PROFISSIONAL_NAO_MEDICO;
+
+    if (restricted) {
+      if (!callerCtx?.profissionalId) {
+        return Promise.resolve([]);
+      }
+    }
+
     const where: Prisma.AgendamentoWhereInput = {};
-    if (query.profissionalId) where.profissionalId = query.profissionalId;
+    if (restricted) {
+      where.profissionalId = callerCtx?.profissionalId;
+    } else {
+      if (query.profissionalId) where.profissionalId = query.profissionalId;
+    }
     if (query.pacienteId) where.pacienteId = query.pacienteId;
     if (query.status) where.status = query.status;
     if (query.inicio || query.fim) {
@@ -214,6 +231,16 @@ export class AgendaService {
       },
       take: 500,
     });
+  }
+
+  async findOneForCaller(
+    id: string,
+    ctx: CallerCtx,
+    callerProfissionalId?: string,
+  ) {
+    const ag = await this.findOne(id);
+    this.assertOwnership(ag, ctx, callerProfissionalId);
+    return ag;
   }
 
   async findOne(id: string) {
@@ -355,11 +382,19 @@ export class AgendaService {
     return atualizado;
   }
 
-  async chamar(id: string, ctx: CallerCtx) {
+  async chamar(id: string, ctx: CallerCtx, callerProfissionalId?: string) {
+    const ag = await this.findOne(id);
+    this.assertOwnership(ag, ctx, callerProfissionalId);
     return this.update(id, { status: AgendamentoStatus.EM_ATENDIMENTO }, ctx);
   }
 
-  async marcarAtendido(id: string, ctx: CallerCtx) {
+  async marcarAtendido(
+    id: string,
+    ctx: CallerCtx,
+    callerProfissionalId?: string,
+  ) {
+    const ag = await this.findOne(id);
+    this.assertOwnership(ag, ctx, callerProfissionalId);
     return this.update(id, { status: AgendamentoStatus.ATENDIDO }, ctx);
   }
 
@@ -465,6 +500,26 @@ export class AgendaService {
       resultado: AuditResultado.SUCESSO,
       traceId: ctx.traceId,
     });
+  }
+
+  private assertOwnership(
+    ag: { profissionalId: string },
+    ctx: CallerCtx,
+    callerProfissionalId?: string,
+  ): void {
+    const restricted =
+      ctx.perfil === PerfilTipo.MEDICO ||
+      ctx.perfil === PerfilTipo.PROFISSIONAL_NAO_MEDICO;
+    if (
+      restricted &&
+      (callerProfissionalId === undefined ||
+        ag.profissionalId !== callerProfissionalId)
+    ) {
+      throw new ForbiddenException({
+        code: 'FORBIDDEN',
+        message: 'Profissional só pode acessar a própria agenda',
+      });
+    }
   }
 
   private validarIntervalo(inicio: Date, fim: Date) {

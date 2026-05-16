@@ -34,23 +34,24 @@ import { PerfilTipo } from '@prisma/client';
 // ─── CPFs válidos (matematicamente corretos, gerados com dígitos verificadores) ─
 // Cada teste que cria paciente usa CPF diferente → sem colisão entre testes.
 const CPFS = {
-  admin:            '52998224725', // 529.982.247-25  (bem conhecido, válido)
-  recepcao:         '11144477735', // 111.444.777-35  (bem conhecido, válido)
-  duplicado:        '12345678909', // 123.456.789-09
-  findone:          '23456789092', // 234.567.890-92  (exclusivo para GET :id suite)
-  delete:           '34567890175', // 345.678.901-75
-  outro:            '45678901249', // 456.789.012-49
-  historico:        '56789012303', // 567.890.123-03
-  busca_nome:       '67890123469', // 678.901.234-69
-  busca_cpf:        '78901234505', // 789.012.345-05
-  busca_tel:        '89012345642', // 890.123.456-42
-  paginacao_a:      '90123456770', // 901.234.567-70
-  paginacao_b:      '11122233396', // 111.222.333-96
-  patch_admin:      '22233344405', // 222.333.444-05  (exclusivo para PATCH suite — admin)
-  patch_recepcao:   '33344455508', // 333.444.555-08
+  admin: '52998224725', // 529.982.247-25  (bem conhecido, válido)
+  recepcao: '11144477735', // 111.444.777-35  (bem conhecido, válido)
+  duplicado: '12345678909', // 123.456.789-09
+  findone: '23456789092', // 234.567.890-92  (exclusivo para GET :id suite)
+  delete: '34567890175', // 345.678.901-75
+  outro: '45678901249', // 456.789.012-49
+  historico: '56789012303', // 567.890.123-03
+  busca_nome: '67890123469', // 678.901.234-69
+  busca_cpf: '78901234505', // 789.012.345-05
+  busca_tel: '89012345642', // 890.123.456-42
+  paginacao_a: '90123456770', // 901.234.567-70
+  paginacao_b: '11122233396', // 111.222.333-96
+  patch_admin: '22233344405', // 222.333.444-05  (exclusivo para PATCH suite — admin)
+  patch_recepcao: '33344455508', // 333.444.555-08
   patch_concurrent: '44455566619', // 444.555.666-19
-  patch_cpf_dup:    '55566677720', // 555.666.777-20
-  patch_cpf_dup2:   '66677788830', // 666.777.888-30
+  patch_cpf_dup: '55566677720', // 555.666.777-20
+  patch_cpf_dup2: '66677788830', // 666.777.888-30
+  restricao_perfil: '99988877762', // 999.888.777-62 (para teste de restrição PROFISSIONAL_NAO_MEDICO)
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -109,17 +110,31 @@ describe('Pacientes (e2e) — Sprint 2', () => {
       await prisma.agendamentoHistorico.deleteMany({
         where: { agendamento: { pacienteId: { in: ids } } },
       });
-      await prisma.agendamento.deleteMany({ where: { pacienteId: { in: ids } } });
-      await prisma.mensagemWhatsapp.deleteMany({ where: { pacienteId: { in: ids } } });
-      await prisma.listaEspera.deleteMany({ where: { pacienteId: { in: ids } } });
-      await prisma.pacienteHistorico.deleteMany({ where: { pacienteId: { in: ids } } });
+      await prisma.agendamento.deleteMany({
+        where: { pacienteId: { in: ids } },
+      });
+      await prisma.mensagemWhatsapp.deleteMany({
+        where: { pacienteId: { in: ids } },
+      });
+      await prisma.listaEspera.deleteMany({
+        where: { pacienteId: { in: ids } },
+      });
+      await prisma.pacienteHistorico.deleteMany({
+        where: { pacienteId: { in: ids } },
+      });
       await prisma.paciente.deleteMany({ where: { id: { in: ids } } });
     }
 
     // Cria usuários e obtém tokens
     tokenAdmin = await criarTokenPara(PerfilTipo.ADMIN, 'e2e-pacientes-admin');
-    tokenRecepcao = await criarTokenPara(PerfilTipo.RECEPCAO, 'e2e-pacientes-recepcao');
-    tokenMedico = await criarTokenPara(PerfilTipo.MEDICO, 'e2e-pacientes-medico');
+    tokenRecepcao = await criarTokenPara(
+      PerfilTipo.RECEPCAO,
+      'e2e-pacientes-recepcao',
+    );
+    tokenMedico = await criarTokenPara(
+      PerfilTipo.MEDICO,
+      'e2e-pacientes-medico',
+    );
     tokenProfissional = await criarTokenPara(
       PerfilTipo.PROFISSIONAL_NAO_MEDICO,
       'e2e-pacientes-profissional',
@@ -138,10 +153,18 @@ describe('Pacientes (e2e) — Sprint 2', () => {
       await prisma.agendamentoHistorico.deleteMany({
         where: { agendamento: { pacienteId: { in: ids } } },
       });
-      await prisma.agendamento.deleteMany({ where: { pacienteId: { in: ids } } });
-      await prisma.mensagemWhatsapp.deleteMany({ where: { pacienteId: { in: ids } } });
-      await prisma.listaEspera.deleteMany({ where: { pacienteId: { in: ids } } });
-      await prisma.pacienteHistorico.deleteMany({ where: { pacienteId: { in: ids } } });
+      await prisma.agendamento.deleteMany({
+        where: { pacienteId: { in: ids } },
+      });
+      await prisma.mensagemWhatsapp.deleteMany({
+        where: { pacienteId: { in: ids } },
+      });
+      await prisma.listaEspera.deleteMany({
+        where: { pacienteId: { in: ids } },
+      });
+      await prisma.pacienteHistorico.deleteMany({
+        where: { pacienteId: { in: ids } },
+      });
       await prisma.paciente.deleteMany({ where: { id: { in: ids } } });
     }
     await prisma.usuario.deleteMany({
@@ -152,7 +175,10 @@ describe('Pacientes (e2e) — Sprint 2', () => {
 
   // ─── helper: cria usuário e retorna access_token ──────────────────────────
 
-  async function criarTokenPara(perfil: PerfilTipo, prefixo: string): Promise<string> {
+  async function criarTokenPara(
+    perfil: PerfilTipo,
+    prefixo: string,
+  ): Promise<string> {
     const email = uniqueEmail(prefixo);
     const ip = uniqueIp();
 
@@ -203,7 +229,10 @@ describe('Pacientes (e2e) — Sprint 2', () => {
       );
     }
 
-    return { id: res.body.data.id as string, updatedAt: res.body.data.updatedAt as string };
+    return {
+      id: res.body.data.id as string,
+      updatedAt: res.body.data.updatedAt as string,
+    };
   }
 
   // ═════════════════════════════════════════════════════════════════════════════
@@ -423,16 +452,20 @@ describe('Pacientes (e2e) — Sprint 2', () => {
       // Cria pacientes específicos para busca
       await criarPaciente(CPFS.busca_nome, 'Zeferino Buscável Santos');
       await criarPaciente(CPFS.busca_cpf, 'Paciente CPF Busca');
-      await criarPaciente(CPFS.busca_tel, 'Paciente Tel Busca').then(async () => {
-        // Atualiza telefone para valor único buscável
-        const p = await prisma.paciente.findUnique({ where: { cpf: CPFS.busca_tel } });
-        if (p) {
-          await prisma.paciente.update({
-            where: { id: p.id },
-            data: { telefoneWhatsapp: '66977776666' },
+      await criarPaciente(CPFS.busca_tel, 'Paciente Tel Busca').then(
+        async () => {
+          // Atualiza telefone para valor único buscável
+          const p = await prisma.paciente.findUnique({
+            where: { cpf: CPFS.busca_tel },
           });
-        }
-      });
+          if (p) {
+            await prisma.paciente.update({
+              where: { id: p.id },
+              data: { telefoneWhatsapp: '66977776666' },
+            });
+          }
+        },
+      );
       await criarPaciente(CPFS.paginacao_a, 'Paginacao Paciente A');
       await criarPaciente(CPFS.paginacao_b, 'Paginacao Paciente B');
     }, 30_000);
@@ -691,11 +724,17 @@ describe('Pacientes (e2e) — Sprint 2', () => {
       pacienteIdAdmin = pAdmin.id;
       updatedAtAdmin = pAdmin.updatedAt;
 
-      const pRecepcao = await criarPaciente(CPFS.patch_recepcao, 'Patch Recepcao');
+      const pRecepcao = await criarPaciente(
+        CPFS.patch_recepcao,
+        'Patch Recepcao',
+      );
       pacienteIdRecepcao = pRecepcao.id;
       updatedAtRecepcao = pRecepcao.updatedAt;
 
-      const pConcurrent = await criarPaciente(CPFS.patch_concurrent, 'Patch Concurrent');
+      const pConcurrent = await criarPaciente(
+        CPFS.patch_concurrent,
+        'Patch Concurrent',
+      );
       pacienteIdConcurrent = pConcurrent.id;
       updatedAtConcurrent = pConcurrent.updatedAt;
 
@@ -709,8 +748,11 @@ describe('Pacientes (e2e) — Sprint 2', () => {
 
     it('200 — ADMIN atualiza nome do paciente', async () => {
       // Re-lê updatedAt atual do paciente (pode ter sido alterado por outro teste)
-      const atual = await prisma.paciente.findUnique({ where: { cpf: CPFS.patch_recepcao } });
-      if (!atual) throw new Error('Paciente não encontrado para patch admin test');
+      const atual = await prisma.paciente.findUnique({
+        where: { cpf: CPFS.patch_recepcao },
+      });
+      if (!atual)
+        throw new Error('Paciente não encontrado para patch admin test');
 
       const res = await request(app.getHttpServer())
         .patch(`/api/pacientes/${atual.id}`)
@@ -727,8 +769,11 @@ describe('Pacientes (e2e) — Sprint 2', () => {
     });
 
     it('200 — RECEPCAO atualiza telefone do paciente', async () => {
-      const atual = await prisma.paciente.findUnique({ where: { cpf: CPFS.patch_recepcao } });
-      if (!atual) throw new Error('Paciente não encontrado para patch recepcao test');
+      const atual = await prisma.paciente.findUnique({
+        where: { cpf: CPFS.patch_recepcao },
+      });
+      if (!atual)
+        throw new Error('Paciente não encontrado para patch recepcao test');
 
       const res = await request(app.getHttpServer())
         .patch(`/api/pacientes/${atual.id}`)
@@ -761,8 +806,11 @@ describe('Pacientes (e2e) — Sprint 2', () => {
     });
 
     it('409 — CPF duplicado: tentativa de alterar para CPF de outro paciente', async () => {
-      const atual = await prisma.paciente.findUnique({ where: { cpf: CPFS.patch_cpf_dup2 } });
-      if (!atual) throw new Error('Paciente não encontrado para patch cpf dup test');
+      const atual = await prisma.paciente.findUnique({
+        where: { cpf: CPFS.patch_cpf_dup2 },
+      });
+      if (!atual)
+        throw new Error('Paciente não encontrado para patch cpf dup test');
 
       const res = await request(app.getHttpServer())
         .patch(`/api/pacientes/${atual.id}`)
@@ -812,7 +860,9 @@ describe('Pacientes (e2e) — Sprint 2', () => {
     });
 
     it('400 — PATCH com CPF inválido retorna erro de validação', async () => {
-      const atual = await prisma.paciente.findUnique({ where: { cpf: CPFS.patch_concurrent } });
+      const atual = await prisma.paciente.findUnique({
+        where: { cpf: CPFS.patch_concurrent },
+      });
       if (!atual) throw new Error('Paciente não encontrado');
 
       await request(app.getHttpServer())
@@ -953,6 +1003,72 @@ describe('Pacientes (e2e) — Sprint 2', () => {
       expect(res.body.error.trace_id).toBeDefined();
       expect(typeof res.body.error.trace_id).toBe('string');
       expect(res.body.error.trace_id.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // PROFISSIONAL_NAO_MEDICO data restriction
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  describe('PROFISSIONAL_NAO_MEDICO data restriction on GET /:id', () => {
+    const CPF_RESTRICTION = CPFS.restricao_perfil;
+    let pacienteRestricaoId: string;
+
+    beforeAll(async () => {
+      const p = await prisma.paciente.create({
+        data: {
+          cpf: CPF_RESTRICTION,
+          nomeCompleto: 'Paciente Restricao Profile Test',
+          dataNascimento: new Date('1990-06-15'),
+          telefoneWhatsapp: '66999888777',
+          observacoes: 'DADO_SENSIVEL_NAO_RETORNAR_PROFISSIONAL',
+          responsavelNome: 'Responsavel Teste',
+          responsavelCpf: '11122233344',
+        },
+      });
+      pacienteRestricaoId = p.id;
+    }, 10_000);
+
+    afterAll(async () => {
+      await prisma.paciente.deleteMany({ where: { cpf: CPF_RESTRICTION } });
+    });
+
+    it('PROFISSIONAL_NAO_MEDICO receives only basic fields — observacoes absent', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/pacientes/${pacienteRestricaoId}`)
+        .set('Authorization', `Bearer ${tokenProfissional}`)
+        .set('x-forwarded-for', uniqueIp())
+        .expect(200);
+      const d = res.body.data;
+      expect(d.id).toBeDefined();
+      expect(d.nomeCompleto).toBeDefined();
+      expect(d.telefoneWhatsapp).toBeDefined();
+      expect(d.observacoes).toBeUndefined();
+      expect(d.responsavelNome).toBeUndefined();
+      expect(d.responsavelCpf).toBeUndefined();
+      expect(d.endereco).toBeUndefined();
+    });
+
+    it('MEDICO receives full data including observacoes', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/pacientes/${pacienteRestricaoId}`)
+        .set('Authorization', `Bearer ${tokenMedico}`)
+        .set('x-forwarded-for', uniqueIp())
+        .expect(200);
+      expect(res.body.data.observacoes).toBe(
+        'DADO_SENSIVEL_NAO_RETORNAR_PROFISSIONAL',
+      );
+    });
+
+    it('ADMIN receives full data', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/pacientes/${pacienteRestricaoId}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .set('x-forwarded-for', uniqueIp())
+        .expect(200);
+      expect(res.body.data.observacoes).toBe(
+        'DADO_SENSIVEL_NAO_RETORNAR_PROFISSIONAL',
+      );
     });
   });
 });

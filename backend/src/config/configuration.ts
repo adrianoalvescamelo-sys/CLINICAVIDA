@@ -43,6 +43,7 @@ export function validateEnv(config: Record<string, unknown>) {
     'JWT_REFRESH_SECRET',
     'CORS_ORIGIN',
     'BOT_SECRET',
+    'TV_SECRET',
   ];
   const missing = required.filter((k) => !config[k]);
   if (missing.length > 0) {
@@ -58,6 +59,9 @@ export function validateEnv(config: Record<string, unknown>) {
     config.JWT_REFRESH_SECRET.length < 32
   ) {
     throw new Error('JWT_REFRESH_SECRET deve ter pelo menos 32 caracteres');
+  }
+  if (typeof config.TV_SECRET === 'string' && config.TV_SECRET.length < 16) {
+    throw new Error('TV_SECRET deve ter pelo menos 16 caracteres');
   }
   return config;
 }
