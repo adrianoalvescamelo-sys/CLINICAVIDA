@@ -160,9 +160,7 @@ describe('RecepcaoDashboard (e2e)', () => {
           EM_ATENDIMENTO: expect.any(Number),
         }),
       );
-      expect(res.body.data.totalAgenda).toBe(
-        res.body.data.agendaDoDia.length,
-      );
+      expect(res.body.data.totalAgenda).toBe(res.body.data.agendaDoDia.length);
       expect(res.body.data.generatedAt).toEqual(expect.any(String));
       expect(new Date(res.body.data.generatedAt).toISOString()).toBe(
         res.body.data.generatedAt,

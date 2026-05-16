@@ -7,10 +7,7 @@ import { AuditResultado, ListaEsperaStatus, Prisma } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  paginateCursor,
-  resolveTake,
-} from '../common/pagination/cursor.dto';
+import { paginateCursor, resolveTake } from '../common/pagination/cursor.dto';
 import { CreateListaEsperaDto } from './dto/create-lista-espera.dto';
 import { QueryListaEsperaDto } from './dto/query-lista-espera.dto';
 import {
@@ -102,11 +99,7 @@ export class ListaEsperaService {
       where,
       include: this.includeResumo,
       // `id` no final do orderBy garante ordem total estável → cursor confiável
-      orderBy: [
-        { prioridade: 'desc' },
-        { createdAt: 'asc' },
-        { id: 'asc' },
-      ],
+      orderBy: [{ prioridade: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
       take: resolveTake(query.limit),
       cursor: query.cursor ? { id: query.cursor } : undefined,
       skip: query.cursor ? 1 : 0,

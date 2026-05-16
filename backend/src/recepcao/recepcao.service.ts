@@ -188,9 +188,7 @@ export class RecepcaoService {
     for (const row of contagemRaw) {
       const c = row._count;
       contagemPorStatus[row.status] =
-        typeof c === 'object' && c !== null && '_all' in c
-          ? (c._all ?? 0)
-          : 0;
+        typeof c === 'object' && c !== null && '_all' in c ? (c._all ?? 0) : 0;
     }
 
     return {
@@ -205,7 +203,6 @@ export class RecepcaoService {
       generatedAt: new Date().toISOString(),
     };
   }
-
 
   private agendamentoWhere(
     query: QueryDashboardDto,

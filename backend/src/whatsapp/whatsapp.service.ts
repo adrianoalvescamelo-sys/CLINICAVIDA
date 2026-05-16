@@ -13,10 +13,7 @@ import {
 import { v4 as uuid } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import {
-  paginateCursor,
-  resolveTake,
-} from '../common/pagination/cursor.dto';
+import { paginateCursor, resolveTake } from '../common/pagination/cursor.dto';
 
 interface EnfileirarOpts {
   agendamentoId?: string;
@@ -185,7 +182,10 @@ export class WhatsappService {
       return msg;
     }
 
-    const motivo = (erro ?? 'callback do provedor retornou FALHA').slice(0, 500);
+    const motivo = (erro ?? 'callback do provedor retornou FALHA').slice(
+      0,
+      500,
+    );
 
     const atualizada = await this.prisma.mensagemWhatsapp.update({
       where: { id: msg.id },

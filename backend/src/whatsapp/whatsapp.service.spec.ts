@@ -569,7 +569,10 @@ describe('WhatsappService', () => {
     });
 
     it('idempotência: mensagem já em FALHA não re-audita nem re-atualiza', async () => {
-      const msg = makeMensagem({ status: MensagemStatus.FALHA, erro: 'antigo' });
+      const msg = makeMensagem({
+        status: MensagemStatus.FALHA,
+        erro: 'antigo',
+      });
       prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
 
       const result = await service.marcarFalha(EVENT_ID, 'novo erro');
@@ -1054,7 +1057,9 @@ describe('WhatsappService', () => {
 
     it('paginação: rows > limit → nextCursor preenchido com último id', async () => {
       const rows = Array.from({ length: 51 }, (_, i) =>
-        makeMensagem({ id: `11111111-1111-4111-8111-${String(i).padStart(12, '0')}` }),
+        makeMensagem({
+          id: `11111111-1111-4111-8111-${String(i).padStart(12, '0')}`,
+        }),
       );
       prisma.mensagemWhatsapp.findMany.mockResolvedValue(rows);
 

@@ -295,7 +295,9 @@ describe('ListaEsperaService', () => {
     it('paginação: retorna nextCursor quando page cheia', async () => {
       // limit default 50; mock retorna 51 itens (limit+1) para simular página cheia
       const rows = Array.from({ length: 51 }, (_, i) =>
-        makeListaEsperaDb({ id: `cccccccc-cccc-4ccc-8ccc-${String(i).padStart(12, '0')}` }),
+        makeListaEsperaDb({
+          id: `cccccccc-cccc-4ccc-8ccc-${String(i).padStart(12, '0')}`,
+        }),
       );
       prisma.listaEspera.findMany.mockResolvedValue(rows);
 
