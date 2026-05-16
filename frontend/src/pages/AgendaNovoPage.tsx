@@ -48,8 +48,10 @@ export default function AgendaNovoPage() {
         observacoes: obs || undefined,
       });
       navigate('/agenda');
-    } catch (err: any) {
-      const apiErr = err?.response?.data?.error;
+    } catch (err) {
+      const apiErr = (err as {
+        response?: { data?: { error?: { message?: string | string[] } } };
+      })?.response?.data?.error;
       setErro(
         Array.isArray(apiErr?.message)
           ? apiErr.message.join(', ')

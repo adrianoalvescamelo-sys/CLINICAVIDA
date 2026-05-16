@@ -162,7 +162,6 @@ function fetchAndDownload(url: string, token: string, filename: string): void {
       URL.revokeObjectURL(href);
     })
     .catch((err) => {
-      // eslint-disable-next-line no-console
       console.error('Falha no download:', err);
       window.alert('Falha ao gerar arquivo. Verifique suas permissoes.');
     });
