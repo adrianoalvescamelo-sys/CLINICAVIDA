@@ -234,22 +234,48 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
       expect(atualizada?.entregueEm).not.toBeNull();
     });
 
-    it('200 — status FALHA: retorna ok mas não altera mensagem (não implementado no handler)', async () => {
+    it('200 — status FALHA: aciona marcarFalha, seta FALHA + erro (S4 F-1)', async () => {
       const msg = await criarMensagem({ status: MensagemStatus.ENVIADA });
 
       const res = await request(app.getHttpServer())
         .post('/api/bot/whatsapp/status')
         .set('x-bot-secret', BOT_SECRET)
         .set('x-forwarded-for', uniqueIp())
-        .send({ eventId: msg.eventId, status: 'FALHA' })
+        .send({
+          eventId: msg.eventId,
+          status: 'FALHA',
+          erro: 'provider rejected payload',
+        })
         .expect(200);
 
       expect(res.body.data.ok).toBe(true);
-      // Status não deve ter mudado (controller só age em ENTREGUE)
-      const naoAlterada = await prisma.mensagemWhatsapp.findUnique({
+      const alterada = await prisma.mensagemWhatsapp.findUnique({
         where: { id: msg.id },
       });
-      expect(naoAlterada?.status).toBe(MensagemStatus.ENVIADA);
+      expect(alterada?.status).toBe(MensagemStatus.FALHA);
+      expect(alterada?.erro).toBe('provider rejected payload');
+      expect(alterada?.proximoRetryEm).toBeNull();
+    });
+
+    it('200 — status FALHA idempotente: callback duplicado em msg já FALHA não re-atualiza', async () => {
+      const msg = await criarMensagem({
+        status: MensagemStatus.FALHA,
+        erro: 'erro original',
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/api/bot/whatsapp/status')
+        .set('x-bot-secret', BOT_SECRET)
+        .set('x-forwarded-for', uniqueIp())
+        .send({ eventId: msg.eventId, status: 'FALHA', erro: 'novo erro' })
+        .expect(200);
+
+      expect(res.body.data.ok).toBe(true);
+      const inalterada = await prisma.mensagemWhatsapp.findUnique({
+        where: { id: msg.id },
+      });
+      // Erro original preservado — idempotência
+      expect(inalterada?.erro).toBe('erro original');
     });
 
     it('200 — eventId inexistente: retorna ok sem erro (idempotência)', async () => {
@@ -487,7 +513,7 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
       });
     }, 15_000);
 
-    it('200 — ADMIN acessa lista de pendentes', async () => {
+    it('200 — ADMIN acessa lista de pendentes (cursor page)', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/whatsapp/pendentes')
         .set('Authorization', `Bearer ${tokenAdmin}`)
@@ -496,10 +522,11 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
 
       expect(res.body.success).toBe(true);
       expect(res.body.error).toBeNull();
-      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
+      expect(res.body.data).toHaveProperty('nextCursor');
 
       // Deve conter a mensagem criada neste beforeAll
-      const ids = res.body.data.map((m: any) => m.id);
+      const ids = res.body.data.items.map((m: any) => m.id);
       expect(ids).toContain(msgPendente.id);
       expect(ids).toContain(msgFalha.id);
     });
@@ -512,7 +539,7 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
         .expect(200);
 
       expect(res.body.success).toBe(true);
-      expect(Array.isArray(res.body.data)).toBe(true);
+      expect(Array.isArray(res.body.data.items)).toBe(true);
     });
 
     it('403 — MEDICO não acessa pendentes', async () => {
@@ -553,7 +580,7 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
         .set('x-forwarded-for', uniqueIp())
         .expect(200);
 
-      const msgComPaciente = res.body.data.find(
+      const msgComPaciente = res.body.data.items.find(
         (m: any) => m.id === msgPendente.id,
       );
       expect(msgComPaciente).toBeDefined();
@@ -575,22 +602,21 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
         .set('x-forwarded-for', uniqueIp())
         .expect(200);
 
-      const ids = res.body.data.map((m: any) => m.id);
+      const ids = res.body.data.items.map((m: any) => m.id);
       expect(ids).not.toContain(msgEnviada.id);
     });
 
-    it('envelope correto: success=true, error=null, data=array', async () => {
+    it('envelope correto: success=true, error=null, data={items,nextCursor}', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/whatsapp/pendentes')
         .set('Authorization', `Bearer ${tokenAdmin}`)
         .set('x-forwarded-for', uniqueIp())
         .expect(200);
 
-      expect(res.body).toMatchObject({
-        success: true,
-        error: null,
-        data: expect.any(Array),
-      });
+      expect(res.body.success).toBe(true);
+      expect(res.body.error).toBeNull();
+      expect(Array.isArray(res.body.data.items)).toBe(true);
+      expect(res.body.data).toHaveProperty('nextCursor');
     });
   });
 
@@ -721,18 +747,17 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
   // ═════════════════════════════════════════════════════════════════════════════
 
   describe('Schema do envelope de resposta', () => {
-    it('sucesso: { success:true, error:null, data:array }', async () => {
+    it('sucesso: { success:true, error:null, data:{items,nextCursor} }', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/whatsapp/pendentes')
         .set('Authorization', `Bearer ${tokenAdmin}`)
         .set('x-forwarded-for', uniqueIp())
         .expect(200);
 
-      expect(res.body).toMatchObject({
-        success: true,
-        error: null,
-        data: expect.any(Array),
-      });
+      expect(res.body.success).toBe(true);
+      expect(res.body.error).toBeNull();
+      expect(Array.isArray(res.body.data.items)).toBe(true);
+      expect(res.body.data).toHaveProperty('nextCursor');
     });
 
     it('erro 401: { success:false, data:null, error:{code,message,trace_id} }', async () => {

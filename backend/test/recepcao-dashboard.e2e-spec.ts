@@ -146,11 +146,23 @@ describe('RecepcaoDashboard (e2e)', () => {
         'agendaDoDia',
         'aguardando',
         'confirmacoesPendentes',
+        'contagemPorStatus',
         'emAtendimento',
         'generatedAt',
         'listaEspera',
         'mensagensPendentes',
+        'totalAgenda',
       ]);
+      expect(res.body.data.contagemPorStatus).toEqual(
+        expect.objectContaining({
+          CONFIRMADO: expect.any(Number),
+          AGUARDANDO: expect.any(Number),
+          EM_ATENDIMENTO: expect.any(Number),
+        }),
+      );
+      expect(res.body.data.totalAgenda).toBe(
+        res.body.data.agendaDoDia.length,
+      );
       expect(res.body.data.generatedAt).toEqual(expect.any(String));
       expect(new Date(res.body.data.generatedAt).toISOString()).toBe(
         res.body.data.generatedAt,
