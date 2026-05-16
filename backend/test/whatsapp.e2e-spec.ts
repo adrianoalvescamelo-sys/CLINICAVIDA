@@ -81,17 +81,22 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
     app = moduleRef.createNestApplication({ bufferLogs: true });
     app.useLogger(app.get(Logger));
     app.setGlobalPrefix('api', { exclude: ['health', 'ready'] });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     app.useGlobalFilters(new AllExceptionsFilter(app.get(Logger)));
     await app.init();
 
     prisma = app.get(PrismaService);
 
     // Cria usuários e tokens
-    tokenAdmin        = await criarTokenPara(PerfilTipo.ADMIN,                 'wa-admin');
-    tokenRecepcao     = await criarTokenPara(PerfilTipo.RECEPCAO,              'wa-recepcao');
-    tokenMedico       = await criarTokenPara(PerfilTipo.MEDICO,                'wa-medico');
-    tokenProfissional = await criarTokenPara(PerfilTipo.PROFISSIONAL_NAO_MEDICO, 'wa-profissional');
+    tokenAdmin = await criarTokenPara(PerfilTipo.ADMIN, 'wa-admin');
+    tokenRecepcao = await criarTokenPara(PerfilTipo.RECEPCAO, 'wa-recepcao');
+    tokenMedico = await criarTokenPara(PerfilTipo.MEDICO, 'wa-medico');
+    tokenProfissional = await criarTokenPara(
+      PerfilTipo.PROFISSIONAL_NAO_MEDICO,
+      'wa-profissional',
+    );
 
     // Cria profissional e paciente de base para os testes
     const profissional = await prisma.profissional.create({
@@ -151,7 +156,10 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
 
   // ─── helper: cria usuário e retorna access_token ──────────────────────────
 
-  async function criarTokenPara(perfil: PerfilTipo, prefixo: string): Promise<string> {
+  async function criarTokenPara(
+    perfil: PerfilTipo,
+    prefixo: string,
+  ): Promise<string> {
     const email = uniqueEmail(prefixo);
     await prisma.usuario.create({
       data: {
@@ -168,7 +176,9 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
       .send({ email, senha: 'SenhaForte!2026' });
 
     if (res.status !== 200) {
-      throw new Error(`criarTokenPara(${perfil}) falhou: ${res.status} — ${JSON.stringify(res.body)}`);
+      throw new Error(
+        `criarTokenPara(${perfil}) falhou: ${res.status} — ${JSON.stringify(res.body)}`,
+      );
     }
     return res.body.data.access_token as string;
   }
@@ -203,12 +213,22 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
         .post('/api/bot/whatsapp/status')
         .set('x-bot-secret', BOT_SECRET)
         .set('x-forwarded-for', uniqueIp())
-        .send({ eventId: msg.eventId, status: 'ENTREGUE', providerMsgId: 'prov-abc-123' })
+        .send({
+          eventId: msg.eventId,
+          status: 'ENTREGUE',
+          providerMsgId: 'prov-abc-123',
+        })
         .expect(200);
 
-      expect(res.body).toMatchObject({ success: true, data: expect.objectContaining({ ok: true }), error: null });
+      expect(res.body).toMatchObject({
+        success: true,
+        data: expect.objectContaining({ ok: true }),
+        error: null,
+      });
 
-      const atualizada = await prisma.mensagemWhatsapp.findUnique({ where: { id: msg.id } });
+      const atualizada = await prisma.mensagemWhatsapp.findUnique({
+        where: { id: msg.id },
+      });
       expect(atualizada?.status).toBe(MensagemStatus.ENTREGUE);
       expect(atualizada?.providerMsgId).toBe('prov-abc-123');
       expect(atualizada?.entregueEm).not.toBeNull();
@@ -226,7 +246,9 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
 
       expect(res.body.data.ok).toBe(true);
       // Status não deve ter mudado (controller só age em ENTREGUE)
-      const naoAlterada = await prisma.mensagemWhatsapp.findUnique({ where: { id: msg.id } });
+      const naoAlterada = await prisma.mensagemWhatsapp.findUnique({
+        where: { id: msg.id },
+      });
       expect(naoAlterada?.status).toBe(MensagemStatus.ENVIADA);
     });
 
@@ -249,9 +271,11 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
         .expect(401);
 
       expect(res.body.success).toBe(false);
-      expect(['BOT_NOT_CONFIGURED', 'BOT_UNAUTHORIZED', 'UNAUTHORIZED']).toContain(
-        res.body.error.code,
-      );
+      expect([
+        'BOT_NOT_CONFIGURED',
+        'BOT_UNAUTHORIZED',
+        'UNAUTHORIZED',
+      ]).toContain(res.body.error.code);
     });
 
     it('401 — bot-secret inválido: retorna BOT_UNAUTHORIZED', async () => {
@@ -332,7 +356,9 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
       expect(inbound?.resposta).toBe('sim');
 
       // Original marcada como RESPONDIDA
-      const original = await prisma.mensagemWhatsapp.findUnique({ where: { id: msg.id } });
+      const original = await prisma.mensagemWhatsapp.findUnique({
+        where: { id: msg.id },
+      });
       expect(original?.status).toBe(MensagemStatus.RESPONDIDA);
     });
 
@@ -350,7 +376,9 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
         })
         .expect(200);
 
-      const ag = await prisma.agendamento.findUnique({ where: { id: agendamentoId } });
+      const ag = await prisma.agendamento.findUnique({
+        where: { id: agendamentoId },
+      });
       expect(ag?.status).toBe(AgendamentoStatus.CONFIRMADO);
     });
 
@@ -375,14 +403,22 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
         .post('/api/bot/whatsapp/inbound')
         .set('x-bot-secret', BOT_SECRET)
         .set('x-forwarded-for', uniqueIp())
-        .send({ telefone: '66999991111', texto: 'sim', eventIdOriginal: msg.eventId })
+        .send({
+          telefone: '66999991111',
+          texto: 'sim',
+          eventIdOriginal: msg.eventId,
+        })
         .expect(200);
 
       const r2 = await request(app.getHttpServer())
         .post('/api/bot/whatsapp/inbound')
         .set('x-bot-secret', BOT_SECRET)
         .set('x-forwarded-for', uniqueIp())
-        .send({ telefone: '66999991111', texto: 'sim', eventIdOriginal: msg.eventId })
+        .send({
+          telefone: '66999991111',
+          texto: 'sim',
+          eventIdOriginal: msg.eventId,
+        })
         .expect(200);
 
       // Ambas retornam IDs de inbound — cada chamada cria uma mensagem INBOUND
@@ -445,7 +481,10 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
     beforeAll(async () => {
       // Garante que há pelo menos uma mensagem PENDENTE e uma FALHA no banco
       msgPendente = await criarMensagem({ status: MensagemStatus.PENDENTE });
-      msgFalha    = await criarMensagem({ status: MensagemStatus.FALHA, tentativas: 3 });
+      msgFalha = await criarMensagem({
+        status: MensagemStatus.FALHA,
+        tentativas: 3,
+      });
     }, 15_000);
 
     it('200 — ADMIN acessa lista de pendentes', async () => {
@@ -514,7 +553,9 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
         .set('x-forwarded-for', uniqueIp())
         .expect(200);
 
-      const msgComPaciente = res.body.data.find((m: any) => m.id === msgPendente.id);
+      const msgComPaciente = res.body.data.find(
+        (m: any) => m.id === msgPendente.id,
+      );
       expect(msgComPaciente).toBeDefined();
       // Include de paciente deve estar presente
       expect(msgComPaciente.paciente).toBeDefined();
@@ -524,7 +565,9 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
     });
 
     it('200 — mensagens ENVIADA/ENTREGUE não aparecem na lista de pendentes', async () => {
-      const msgEnviada = await criarMensagem({ status: MensagemStatus.ENVIADA });
+      const msgEnviada = await criarMensagem({
+        status: MensagemStatus.ENVIADA,
+      });
 
       const res = await request(app.getHttpServer())
         .get('/api/whatsapp/pendentes')
@@ -580,11 +623,16 @@ describe('WhatsApp (e2e) — Sprint 4', () => {
         where: { id: msgParaReenviar.id },
       });
       // dry-run: não chama n8n de verdade → fica ENVIADA
-      expect([MensagemStatus.ENVIADA, MensagemStatus.PENDENTE]).toContain(atualizada?.status);
+      expect([MensagemStatus.ENVIADA, MensagemStatus.PENDENTE]).toContain(
+        atualizada?.status,
+      );
     });
 
     it('200 — RECEPCAO reenvia mensagem com FALHA', async () => {
-      const msg = await criarMensagem({ status: MensagemStatus.FALHA, tentativas: 1 });
+      const msg = await criarMensagem({
+        status: MensagemStatus.FALHA,
+        tentativas: 1,
+      });
 
       const res = await request(app.getHttpServer())
         .post(`/api/whatsapp/${msg.id}/reenviar`)

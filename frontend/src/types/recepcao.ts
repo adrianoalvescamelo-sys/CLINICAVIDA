@@ -17,3 +17,10 @@ export interface RecepcaoDashboardParams {
   profissionalId?: string;
   status?: AgendamentoStatus;
 }
+
+export interface PainelTVData {
+  chamadoAgora: AgendamentoListItem | null;
+  proximos: AgendamentoListItem[];
+  generatedAt: string;
+}
+

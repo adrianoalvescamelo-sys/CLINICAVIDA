@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { obterDashboardRecepcao } from '../api/recepcao';
+import { obterPainelTV } from '../api/recepcao';
 import type { AgendamentoListItem } from '../types/agenda';
 
 function isoDay(d: Date) {
@@ -10,26 +10,25 @@ function isoDay(d: Date) {
 export default function PainelTVPage() {
   const data = isoDay(new Date());
 
-  const { data: dashboard, isLoading, isError, error } = useQuery({
+  const { data: painel, isLoading, isError, error } = useQuery({
     queryKey: ['painel-tv', data],
-    queryFn: () => obterDashboardRecepcao({ data }),
+    queryFn: () => obterPainelTV(data),
     refetchInterval: 5_000,
   });
 
-  const emAtendimento = dashboard?.emAtendimento ?? [];
-  const aguardando = dashboard?.aguardando ?? [];
-  const destaque = emAtendimento[0];
+  const destaque = painel?.chamadoAgora;
+  const proximos = painel?.proximos ?? [];
 
   return (
     <div style={pageStyle}>
       <div style={backdropStyle} />
       <header style={headerStyle}>
         <div>
-          <div style={brandStyle}>ClÃ­nica Vida</div>
+          <div style={brandStyle}>Clínica Vida</div>
           <div style={subtitleStyle}>Painel de chamada</div>
         </div>
         <div style={metaStyle}>
-          AtualizaÃ§Ã£o automÃ¡tica a cada 5s
+          Atualização automática a cada 5s
           <span style={{ marginLeft: 12, opacity: 0.8 }}>
             {new Date().toLocaleTimeString('pt-BR', {
               hour: '2-digit',
@@ -55,7 +54,7 @@ export default function PainelTVPage() {
                 {formatTime(destaque.dataHoraInicio)} -{' '}
                 {destaque.profissional.nomeCompleto}
               </div>
-              <div style={heroPulseStyle}>Dirija-se ao consultÃ³rio</div>
+              <div style={heroPulseStyle}>Dirija-se ao consultório</div>
             </>
           ) : (
             !isLoading &&
@@ -63,7 +62,7 @@ export default function PainelTVPage() {
               <>
                 <div style={heroNameStyle}>Aguardando chamada</div>
                 <div style={heroMetaStyle}>
-                  Nenhum paciente estÃ¡ em atendimento neste momento
+                  Nenhum paciente está em atendimento neste momento
                 </div>
               </>
             )
@@ -80,8 +79,8 @@ export default function PainelTVPage() {
           </Panel>
 
           <Panel title="Fila de espera">
-            {aguardando.length > 0 ? (
-              aguardando.slice(0, 6).map((item) => (
+            {proximos.length > 0 ? (
+              proximos.map((item) => (
                 <QueueCard key={item.id} item={item} />
               ))
             ) : (
@@ -94,7 +93,7 @@ export default function PainelTVPage() {
               Abrir agenda do dia
             </Link>
             <Link to="/recepcao" style={secondaryLinkStyle}>
-              Ver recepÃ§Ã£o
+              Ver recepção
             </Link>
           </Panel>
         </aside>
@@ -102,6 +101,7 @@ export default function PainelTVPage() {
     </div>
   );
 }
+
 
 function Panel({
   title,
