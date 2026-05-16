@@ -15,7 +15,7 @@ export class TvAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<Request>();
     const sent = req.header('x-tv-token') ?? '';
-    const expected = this.config.get<string>('tvSecret') ?? '';
+    const expected = this.config.get<string>('security.tvSecret') ?? '';
 
     if (!expected || expected.length < 16) {
       throw new UnauthorizedException({

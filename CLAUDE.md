@@ -159,9 +159,11 @@ docker compose logs -f api               # acompanhar API
 
 ## Variáveis de ambiente obrigatórias (backend)
 
-`DATABASE_URL`, `JWT_SECRET` (≥32 chars), `JWT_REFRESH_SECRET` (≥32 chars), `CORS_ORIGIN`, `BOT_SECRET`.
+`DATABASE_URL`, `JWT_SECRET` (≥32 chars), `JWT_REFRESH_SECRET` (≥32 chars), `CORS_ORIGIN`, `BOT_SECRET`, `TV_SECRET` (≥16 chars).
 
-Opcionais com defaults: `PORT=3000`, `JWT_EXPIRES_IN=15m`, `JWT_REFRESH_EXPIRES_IN=7d`, `AUTH_MAX_ATTEMPTS=5`, `AUTH_LOCKOUT_MINUTES=15`, `LOG_LEVEL=info`, `N8N_WEBHOOK_URL`, `WA_ENABLED=true`, `WA_DRY_RUN=false`, `TV_SECRET`.
+Opcionais com defaults: `PORT=3000`, `JWT_EXPIRES_IN=15m`, `JWT_REFRESH_EXPIRES_IN=7d`, `AUTH_MAX_ATTEMPTS=5`, `AUTH_LOCKOUT_MINUTES=15`, `LOG_LEVEL=info`, `N8N_WEBHOOK_URL`, `N8N_TIMEOUT_MS=10000`, `WA_ENABLED=true`, `WA_DRY_RUN=false`, `WA_MAX_TENTATIVAS=3`, `WA_CONFIRMACAO_HORAS=24`, `WA_LEMBRETE_HORAS=2`, `WA_LIMITE_AUTO_HORAS=2`.
+
+Frontend opcional: `VITE_API_URL=http://localhost:3000` (proxy alvo; Vite já faz proxy de `/api` em dev).
 
 ## Arquitetura
 
@@ -193,14 +195,18 @@ Rotas públicas: `POST /api/auth/login`, `POST /api/auth/refresh`, `GET /health`
 
 ### Frontend — React + Vite + PWA
 
-- **Roteamento**: `react-router-dom` v6, todas rotas protegidas por `PrivateRoute` (verifica token Zustand).
+- **Roteamento**: `react-router-dom` v6, todas rotas protegidas por `PrivateRoute` (verifica token Zustand). `RoleRoute` restringe por perfil.
 - **Estado de auth**: `zustand` em `frontend/src/store/auth.ts`.
 - **HTTP**: `axios` com `baseURL: '/api'` em `frontend/src/api/client.ts`. Interceptor injeta Bearer token e redireciona para `/login` em 401.
 - **Server state**: `@tanstack/react-query` v5.
+- **Path alias**: `@` → `frontend/src/` (configurado em `vite.config.ts`).
 - Cada domain tem seu módulo de API em `frontend/src/api/<domain>.ts`.
+- PWA registra SW com `autoUpdate`; cache de API usa `NetworkFirst` com timeout 5s.
 
 ### Camadas cross-cutting
 
 - `trace_id` (UUID v4) gerado por `TraceIdMiddleware` em cada request, propagado via `req.trace_id`, incluído em logs e erros.
 - Rate limit global: 100 req/min por IP (`ThrottlerProxyGuard` lida com proxy X-Forwarded-For).
 - Logs estruturados via `nestjs-pino`; `req.headers.authorization` e `req.body.senha` redacted automaticamente.
+- APP_GUARD ordem (importa para lógica de short-circuit): `ThrottlerProxyGuard` → `JwtAuthGuard` → `RolesGuard`.
+- Rotas sem JWT: decorar com `@Public()`. Rotas sem envelope de resposta: `@SkipResponseInterceptor()`.

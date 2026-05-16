@@ -106,6 +106,7 @@ export class RecepcaoService {
       emAtendimento,
       mensagensPendentes,
       listaEspera,
+      contagemRaw,
     ] = await this.prisma.$transaction([
       this.prisma.agendamento.findMany({
         where: dayWhere,
@@ -172,7 +173,25 @@ export class RecepcaoService {
         orderBy: [{ prioridade: 'desc' }, { createdAt: 'asc' }],
         take: 100,
       }),
+      this.prisma.agendamento.groupBy({
+        by: ['status'],
+        where: dayWhere,
+        _count: { _all: true },
+        orderBy: { status: 'asc' },
+      }),
     ]);
+
+    const contagemPorStatus = Object.values(AgendamentoStatus).reduce(
+      (acc, s) => ({ ...acc, [s]: 0 }),
+      {} as Record<AgendamentoStatus, number>,
+    );
+    for (const row of contagemRaw) {
+      const c = row._count;
+      contagemPorStatus[row.status] =
+        typeof c === 'object' && c !== null && '_all' in c
+          ? (c._all ?? 0)
+          : 0;
+    }
 
     return {
       agendaDoDia,
@@ -181,9 +200,12 @@ export class RecepcaoService {
       emAtendimento,
       mensagensPendentes,
       listaEspera,
+      contagemPorStatus,
+      totalAgenda: agendaDoDia.length,
       generatedAt: new Date().toISOString(),
     };
   }
+
 
   private agendamentoWhere(
     query: QueryDashboardDto,

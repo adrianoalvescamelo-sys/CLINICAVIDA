@@ -276,7 +276,7 @@ export class ListaEsperaService {
     if (STATUS_FINAIS.includes(de)) {
       throw new ConflictException({
         code: 'TRANSICAO_LISTA_ESPERA_INVALIDA',
-        message: `Nao e possivel alterar lista de espera a partir de ${de}`,
+        message: `Não é possível alterar lista de espera a partir de ${de}`,
       });
     }
 
@@ -300,7 +300,7 @@ export class ListaEsperaService {
     if (!permitidas[de].includes(para)) {
       throw new ConflictException({
         code: 'TRANSICAO_LISTA_ESPERA_INVALIDA',
-        message: `Transicao de ${de} para ${para} nao permitida`,
+        message: `Transição de ${de} para ${para} não permitida`,
       });
     }
   }

@@ -170,6 +170,48 @@ export class WhatsappService {
     });
   }
 
+  async marcarFalha(eventId: string, erro?: string, providerMsgId?: string) {
+    const msg = await this.prisma.mensagemWhatsapp.findUnique({
+      where: { eventId },
+    });
+    if (!msg) return null;
+
+    // Idempotência: callback duplicado para mensagem já em FALHA não re-audita
+    if (msg.status === MensagemStatus.FALHA) {
+      return msg;
+    }
+
+    const motivo = (erro ?? 'callback do provedor retornou FALHA').slice(0, 500);
+
+    const atualizada = await this.prisma.mensagemWhatsapp.update({
+      where: { id: msg.id },
+      data: {
+        status: MensagemStatus.FALHA,
+        erro: motivo,
+        providerMsgId: providerMsgId ?? msg.providerMsgId,
+        proximoRetryEm: null,
+      },
+    });
+
+    await this.audit.log({
+      usuarioId: null,
+      acao: 'WHATSAPP_FALHA_CALLBACK',
+      entidade: 'MensagemWhatsapp',
+      registroId: msg.id,
+      ipDispositivo: 'callback',
+      resultado: AuditResultado.FALHA,
+      traceId: msg.eventId,
+      detalhes: { motivo, providerMsgId: providerMsgId ?? msg.providerMsgId },
+    });
+
+    this.logger.warn(
+      { msgId: msg.id, eventId, motivo },
+      'WhatsApp marcado como FALHA via callback',
+    );
+
+    return atualizada;
+  }
+
   async receberResposta(opts: {
     eventIdOriginal?: string;
     telefone: string;

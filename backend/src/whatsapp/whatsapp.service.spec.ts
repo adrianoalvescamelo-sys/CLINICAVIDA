@@ -515,6 +515,119 @@ describe('WhatsappService', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // marcarFalha
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('marcarFalha', () => {
+    it('sucesso: atualiza status para FALHA, salva erro, audita', async () => {
+      const msg = makeMensagem({ status: MensagemStatus.ENVIADA });
+      const atualizada = {
+        ...msg,
+        status: MensagemStatus.FALHA,
+        erro: 'rate limited by provider',
+        providerMsgId: 'prov-err-1',
+      };
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue(atualizada);
+
+      const result = await service.marcarFalha(
+        EVENT_ID,
+        'rate limited by provider',
+        'prov-err-1',
+      );
+
+      expect(result).toEqual(atualizada);
+      expect(prisma.mensagemWhatsapp.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: msg.id },
+          data: expect.objectContaining({
+            status: MensagemStatus.FALHA,
+            erro: 'rate limited by provider',
+            providerMsgId: 'prov-err-1',
+            proximoRetryEm: null,
+          }),
+        }),
+      );
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          acao: 'WHATSAPP_FALHA_CALLBACK',
+          resultado: AuditResultado.FALHA,
+          entidade: 'MensagemWhatsapp',
+          registroId: msg.id,
+        }),
+      );
+    });
+
+    it('retorna null quando eventId não encontrado (idempotência callback duplo)', async () => {
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(null);
+
+      const result = await service.marcarFalha('evt-inexistente', 'qualquer');
+
+      expect(result).toBeNull();
+      expect(prisma.mensagemWhatsapp.update).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+    });
+
+    it('idempotência: mensagem já em FALHA não re-audita nem re-atualiza', async () => {
+      const msg = makeMensagem({ status: MensagemStatus.FALHA, erro: 'antigo' });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+
+      const result = await service.marcarFalha(EVENT_ID, 'novo erro');
+
+      expect(result).toEqual(msg);
+      expect(prisma.mensagemWhatsapp.update).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+    });
+
+    it('preserva providerMsgId existente quando callback não traz novo', async () => {
+      const msg = makeMensagem({
+        status: MensagemStatus.ENVIADA,
+        providerMsgId: 'prov-prev',
+      });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue(msg);
+
+      await service.marcarFalha(EVENT_ID, 'erro sem providerMsgId');
+
+      expect(prisma.mensagemWhatsapp.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ providerMsgId: 'prov-prev' }),
+        }),
+      );
+    });
+
+    it('default erro quando callback sem campo erro', async () => {
+      const msg = makeMensagem({ status: MensagemStatus.ENVIADA });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue(msg);
+
+      await service.marcarFalha(EVENT_ID);
+
+      expect(prisma.mensagemWhatsapp.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            erro: 'callback do provedor retornou FALHA',
+          }),
+        }),
+      );
+    });
+
+    it('trunca erro longo para 500 caracteres', async () => {
+      const msg = makeMensagem({ status: MensagemStatus.ENVIADA });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue(msg);
+
+      const erroLongo = 'x'.repeat(800);
+      await service.marcarFalha(EVENT_ID, erroLongo);
+
+      const call = prisma.mensagemWhatsapp.update.mock.calls[0][0] as {
+        data: { erro: string };
+      };
+      expect(call.data.erro.length).toBe(500);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // receberResposta
   // ═══════════════════════════════════════════════════════════════════════════
 

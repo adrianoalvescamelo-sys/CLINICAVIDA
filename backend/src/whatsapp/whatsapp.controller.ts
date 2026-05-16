@@ -33,6 +33,8 @@ export class WhatsappController {
   async callbackStatus(@Body() dto: CallbackStatusDto) {
     if (dto.status === 'ENTREGUE') {
       await this.wa.marcarEntregue(dto.eventId, dto.providerMsgId);
+    } else if (dto.status === 'FALHA') {
+      await this.wa.marcarFalha(dto.eventId, dto.erro, dto.providerMsgId);
     }
     return { ok: true };
   }

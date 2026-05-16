@@ -96,7 +96,7 @@ function makeListaEspera(overrides: Record<string, unknown> = {}) {
 function makePrismaMock() {
   return {
     $transaction: jest.fn(),
-    agendamento: { findMany: jest.fn() },
+    agendamento: { findMany: jest.fn(), groupBy: jest.fn() },
     mensagemWhatsapp: { findMany: jest.fn() },
     listaEspera: { findMany: jest.fn() },
   };
@@ -151,6 +151,12 @@ describe('RecepcaoService', () => {
         [agEmAtendimento], // emAtendimento
         [msg], // mensagensPendentes
         [le], // listaEspera
+        [
+          { status: AgendamentoStatus.CONFIRMADO, _count: { _all: 1 } },
+          { status: AgendamentoStatus.AGUARDANDO, _count: { _all: 1 } },
+          { status: AgendamentoStatus.SOLICITADO, _count: { _all: 1 } },
+          { status: AgendamentoStatus.EM_ATENDIMENTO, _count: { _all: 1 } },
+        ],
       ]);
 
       const result = await service.dashboard(baseQuery as any);
@@ -171,7 +177,7 @@ describe('RecepcaoService', () => {
     });
 
     it('retorna empty state quando não há dados', async () => {
-      prisma.$transaction.mockResolvedValue([[], [], [], [], [], []]);
+      prisma.$transaction.mockResolvedValue([[], [], [], [], [], [], []]);
 
       const result = await service.dashboard(baseQuery as any);
 
@@ -185,7 +191,7 @@ describe('RecepcaoService', () => {
     });
 
     it('filtra por profissionalId quando fornecido', async () => {
-      prisma.$transaction.mockResolvedValue([[], [], [], [], [], []]);
+      prisma.$transaction.mockResolvedValue([[], [], [], [], [], [], []]);
 
       await service.dashboard({
         data: '2026-06-15',
@@ -199,11 +205,11 @@ describe('RecepcaoService', () => {
       // Inspeciona as queries passadas para a transação
       const transactionArg = prisma.$transaction.mock.calls[0][0];
       expect(Array.isArray(transactionArg)).toBe(true);
-      expect(transactionArg).toHaveLength(6);
+      expect(transactionArg).toHaveLength(7);
     });
 
     it('filtra por status quando fornecido', async () => {
-      prisma.$transaction.mockResolvedValue([[], [], [], [], [], []]);
+      prisma.$transaction.mockResolvedValue([[], [], [], [], [], [], []]);
 
       await service.dashboard({
         data: '2026-06-15',
@@ -213,8 +219,76 @@ describe('RecepcaoService', () => {
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
 
+    // ─── contagemPorStatus (Sprint hardening S5+6 F5) ────────────────────────
+
+    it('contagemPorStatus: retorna todos os statuses com zero quando ausentes', async () => {
+      prisma.$transaction.mockResolvedValue([[], [], [], [], [], [], []]);
+
+      const result = await service.dashboard(baseQuery as any);
+
+      // Todos os 9 statuses presentes mesmo sem dados
+      const statuses = Object.values(AgendamentoStatus);
+      expect(Object.keys(result.contagemPorStatus).sort()).toEqual(
+        [...statuses].sort(),
+      );
+      // Todos zerados
+      for (const s of statuses) {
+        expect(result.contagemPorStatus[s]).toBe(0);
+      }
+    });
+
+    it('contagemPorStatus: agrega contagens reais do groupBy', async () => {
+      prisma.$transaction.mockResolvedValue([
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [
+          { status: AgendamentoStatus.CONFIRMADO, _count: { _all: 5 } },
+          { status: AgendamentoStatus.AGUARDANDO, _count: { _all: 2 } },
+          { status: AgendamentoStatus.FALTOU, _count: { _all: 1 } },
+        ],
+      ]);
+
+      const result = await service.dashboard(baseQuery as any);
+
+      expect(result.contagemPorStatus[AgendamentoStatus.CONFIRMADO]).toBe(5);
+      expect(result.contagemPorStatus[AgendamentoStatus.AGUARDANDO]).toBe(2);
+      expect(result.contagemPorStatus[AgendamentoStatus.FALTOU]).toBe(1);
+      // Outros permanecem zero
+      expect(result.contagemPorStatus[AgendamentoStatus.CANCELADO]).toBe(0);
+      expect(result.contagemPorStatus[AgendamentoStatus.SOLICITADO]).toBe(0);
+    });
+
+    it('contagemPorStatus: lida com _count undefined sem quebrar', async () => {
+      prisma.$transaction.mockResolvedValue([
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [{ status: AgendamentoStatus.CONFIRMADO, _count: undefined }],
+      ]);
+
+      const result = await service.dashboard(baseQuery as any);
+
+      expect(result.contagemPorStatus[AgendamentoStatus.CONFIRMADO]).toBe(0);
+    });
+
+    it('totalAgenda: reflete tamanho de agendaDoDia', async () => {
+      const ags = [makeAgendamento(), makeAgendamento(), makeAgendamento()];
+      prisma.$transaction.mockResolvedValue([ags, [], [], [], [], [], []]);
+
+      const result = await service.dashboard(baseQuery as any);
+
+      expect(result.totalAgenda).toBe(3);
+    });
+
     it('generatedAt é timestamp ISO atual', async () => {
-      prisma.$transaction.mockResolvedValue([[], [], [], [], [], []]);
+      prisma.$transaction.mockResolvedValue([[], [], [], [], [], [], []]);
 
       const before = Date.now();
       const result = await service.dashboard(baseQuery as any);
@@ -244,7 +318,7 @@ describe('RecepcaoService', () => {
       // Queremos apenas verificar que o service chama $transaction sem lançar erro
       // para uma data válida. A verificação do range correto está coberta pelo e2e
       // com o fixture "dia anterior local" que usa T03:30Z e deve ficar FORA.
-      prisma.$transaction.mockResolvedValue([[], [], [], [], [], []]);
+      prisma.$transaction.mockResolvedValue([[], [], [], [], [], [], []]);
 
       await expect(
         service.dashboard({ data: '2026-06-15' } as any),
@@ -252,7 +326,7 @@ describe('RecepcaoService', () => {
     });
 
     it('boundary de virada de mês: 2026-06-30 não lança erro', async () => {
-      prisma.$transaction.mockResolvedValue([[], [], [], [], [], []]);
+      prisma.$transaction.mockResolvedValue([[], [], [], [], [], [], []]);
 
       await expect(
         service.dashboard({ data: '2026-06-30' } as any),
@@ -262,7 +336,7 @@ describe('RecepcaoService', () => {
     });
 
     it('boundary de virada de ano: 2026-12-31 não lança erro', async () => {
-      prisma.$transaction.mockResolvedValue([[], [], [], [], [], []]);
+      prisma.$transaction.mockResolvedValue([[], [], [], [], [], [], []]);
 
       await expect(
         service.dashboard({ data: '2026-12-31' } as any),

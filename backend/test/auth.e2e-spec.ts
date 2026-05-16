@@ -208,7 +208,7 @@ describe('Auth (e2e) — T10 completo', () => {
       expect(d.usuario.senha).toBeUndefined();
     });
 
-    it('senha errada → 401 + code CREDENCIAIS_INVALIDAS ou UNAUTHORIZED (sem enumeration)', async () => {
+    it('senha errada → 401 + code CREDENCIAIS_INVALIDAS (sem enumeration)', async () => {
       const ip = uniqueIp();
       const res = await request(app.getHttpServer())
         .post('/api/auth/login')
@@ -217,14 +217,12 @@ describe('Auth (e2e) — T10 completo', () => {
         .expect(401);
 
       expect(res.body.success).toBe(false);
-      expect(['CREDENCIAIS_INVALIDAS', 'UNAUTHORIZED']).toContain(
-        res.body.error.code,
-      );
+      expect(res.body.error.code).toBe('CREDENCIAIS_INVALIDAS');
       expect(res.body.error.trace_id).toBeDefined();
       expect(res.body.data).toBeNull();
     });
 
-    it('email inexistente → 401 (mesmo code que senha errada — sem enumeration)', async () => {
+    it('email inexistente → 401 com mesmo code (anti-enumeration)', async () => {
       const ip = uniqueIp();
       const res = await request(app.getHttpServer())
         .post('/api/auth/login')
@@ -236,9 +234,7 @@ describe('Auth (e2e) — T10 completo', () => {
         .expect(401);
 
       expect(res.body.success).toBe(false);
-      expect(['CREDENCIAIS_INVALIDAS', 'UNAUTHORIZED']).toContain(
-        res.body.error.code,
-      );
+      expect(res.body.error.code).toBe('CREDENCIAIS_INVALIDAS');
       // Anti-enumeration: mesmo code para email inexistente e senha errada
       expect(res.body.error.message).toBeDefined();
     });

@@ -4,12 +4,11 @@ import {
   Get,
   Query,
   Req,
-  Res,
   StreamableFile,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 import { AuditResultado, PerfilTipo } from '@prisma/client';
 import { RelatoriosService, CallerCtx } from './relatorios.service';
 import { QueryRelatorioDto } from './dto/query-relatorio.dto';
@@ -140,7 +139,6 @@ export class RelatoriosController {
     @Query() dto: QueryAgendaDiaDto,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const ctx = await this.ctx(req, user);
     try {
@@ -160,7 +158,6 @@ export class RelatoriosController {
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const ctx = await this.ctx(req, user);
     try {
@@ -194,7 +191,6 @@ export class RelatoriosController {
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const ctx = await this.ctx(req, user);
     try {
@@ -214,7 +210,6 @@ export class RelatoriosController {
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const ctx = await this.ctx(req, user);
     try {
@@ -238,7 +233,6 @@ export class RelatoriosController {
     @Query() dto: QueryAgendaDiaDto,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const ctx = await this.ctx(req, user);
     try {
@@ -258,7 +252,6 @@ export class RelatoriosController {
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const ctx = await this.ctx(req, user);
     try {
@@ -292,7 +285,6 @@ export class RelatoriosController {
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const ctx = await this.ctx(req, user);
     try {
@@ -312,7 +304,6 @@ export class RelatoriosController {
     @Query() dto: QueryRelatorioDto,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     const ctx = await this.ctx(req, user);
     try {

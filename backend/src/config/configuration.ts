@@ -17,10 +17,6 @@ export default () => ({
     botSecret: process.env.BOT_SECRET ?? '',
     tvSecret: process.env.TV_SECRET ?? '',
   },
-  /** @deprecated use config.security.botSecret — kept for backward compat with bot-auth.guard */
-  botSecret: process.env.BOT_SECRET ?? '',
-  /** @deprecated use config.security.tvSecret — kept for backward compat with tv-auth.guard */
-  tvSecret: process.env.TV_SECRET ?? '',
   whatsapp: {
     n8nWebhookUrl: process.env.N8N_WEBHOOK_URL ?? '',
     n8nTimeoutMs: parseInt(process.env.N8N_TIMEOUT_MS ?? '10000', 10),

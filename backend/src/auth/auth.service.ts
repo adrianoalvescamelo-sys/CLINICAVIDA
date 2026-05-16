@@ -118,7 +118,7 @@ export class AuthService {
         detalhes: { email, motivo: 'usuario_nao_encontrado' },
       });
       throw new UnauthorizedException({
-        code: 'UNAUTHORIZED',
+        code: 'CREDENCIAIS_INVALIDAS',
         message: 'Credenciais inválidas',
       });
     }
@@ -176,7 +176,7 @@ export class AuthService {
       });
 
       throw new UnauthorizedException({
-        code: 'UNAUTHORIZED',
+        code: 'CREDENCIAIS_INVALIDAS',
         message: 'Credenciais inválidas',
       });
     }
