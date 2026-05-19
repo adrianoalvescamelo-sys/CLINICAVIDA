@@ -26,6 +26,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Prisma engine precisa de openssl no Alpine
+RUN apk add --no-cache openssl
+
 COPY package*.json ./
 COPY backend/package*.json ./backend/
 
@@ -38,8 +41,11 @@ COPY --from=builder /app/backend/dist ./backend/dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY backend/prisma ./backend/prisma
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
+# Create non-root user e dá ownership de /app
+# (prisma migrate deploy precisa escrever em node_modules/@prisma/engines)
+RUN addgroup -g 1001 -S nodejs \
+  && adduser -S nestjs -u 1001 \
+  && chown -R nestjs:nodejs /app
 USER nestjs
 
 EXPOSE 3000
