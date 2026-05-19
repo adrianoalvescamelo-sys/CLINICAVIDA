@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import AgendaSemana from '../components/AgendaSemana';
+import AgendamentoDetalheModal from '../components/AgendamentoDetalheModal';
 import {
   chamarAgendamento,
   alterarStatus,
@@ -50,11 +51,11 @@ function fmtSemana(ini: Date): string {
 }
 
 export default function AgendaPage() {
-  const navigate = useNavigate();
   const [vista, setVista] = useState<Vista>('SEMANA');
   const [data, setData] = useState(clinicDayKey(new Date()));
   const [semanaIni, setSemanaIni] = useState(() => inicioSemana(new Date()));
   const [profissionalId, setProfissionalId] = useState<string>('');
+  const [detalheAg, setDetalheAg] = useState<AgendamentoListItem | null>(null);
   const qc = useQueryClient();
 
   const { data: profissionais } = useQuery({
@@ -118,9 +119,7 @@ export default function AgendaPage() {
   }
 
   function handleAgendamentoClick(a: AgendamentoListItem) {
-    // Por enquanto: vai pra detail page se houver, ou ações inline
-    navigate(`/agenda?id=${a.id}`);
-    // TODO: AgendamentoDetalheModal
+    setDetalheAg(a);
   }
 
   return (
@@ -294,7 +293,14 @@ export default function AgendaPage() {
                     const f = new Date(a.dataHoraFim);
                     const sb = statusBadge(a.status);
                     return (
-                      <tr key={a.id} style={{ borderTop: '1px solid #e2e8f0' }}>
+                      <tr
+                        key={a.id}
+                        style={{
+                          borderTop: '1px solid #e2e8f0',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setDetalheAg(a)}
+                      >
                         <Td>
                           {ini.toLocaleTimeString('pt-BR', {
                             hour: '2-digit',
@@ -399,6 +405,11 @@ export default function AgendaPage() {
           )}
         </>
       )}
+
+      <AgendamentoDetalheModal
+        agendamento={detalheAg}
+        onClose={() => setDetalheAg(null)}
+      />
     </Layout>
   );
 }
@@ -480,7 +491,10 @@ function ActionBtn({
 }) {
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       style={{
         padding: '4px 10px',
         fontSize: 12,
