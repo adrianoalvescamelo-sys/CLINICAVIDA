@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  atualizarAgendamento,
   listAgendamentos,
   listarBloqueios,
   type Bloqueio,
@@ -9,6 +10,13 @@ import { getConfiguracao } from '../api/configuracoes';
 import type { AgendamentoListItem, AgendamentoStatus } from '../types/agenda';
 import AgendaSlotModal from './AgendaSlotModal';
 import BloqueioDetalheModal from './BloqueioDetalheModal';
+
+const REMARCAVEL: AgendamentoStatus[] = [
+  'SOLICITADO',
+  'PRE_AGENDAMENTO',
+  'CONFIRMADO',
+  'CONFIRMACAO_TARDIA',
+];
 
 interface Props {
   semanaInicio: Date; // domingo da semana
@@ -83,6 +91,47 @@ export default function AgendaSemana({
   const [bloqueioSelecionado, setBloqueioSelecionado] = useState<Bloqueio | null>(
     null,
   );
+  const [draggedAg, setDraggedAg] = useState<AgendamentoListItem | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null); // "dia-idx:hora"
+  const qc = useQueryClient();
+
+  const remarcar = useMutation({
+    mutationFn: (args: { id: string; inicio: Date; fim: Date }) =>
+      atualizarAgendamento(args.id, {
+        dataHoraInicio: args.inicio.toISOString(),
+        dataHoraFim: args.fim.toISOString(),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['agendamentos'] }),
+    onError: (err) => {
+      const e = err as {
+        response?: { data?: { error?: { message?: string | string[] } } };
+      };
+      const m = e?.response?.data?.error?.message;
+      const msg = Array.isArray(m) ? m.join(', ') : (m ?? 'Erro ao remarcar');
+      window.alert(msg);
+    },
+  });
+
+  function handleDrop(dia: Date, hora: string) {
+    if (!draggedAg) return;
+    const ag = draggedAg;
+    setDraggedAg(null);
+    setDropTarget(null);
+    const [h, m] = hora.split(':').map(Number);
+    const novoIni = new Date(dia);
+    novoIni.setHours(h, m, 0, 0);
+    const duracaoMs =
+      new Date(ag.dataHoraFim).getTime() - new Date(ag.dataHoraInicio).getTime();
+    const novoFim = new Date(novoIni.getTime() + duracaoMs);
+    if (novoIni.getTime() === new Date(ag.dataHoraInicio).getTime()) return;
+    if (
+      !window.confirm(
+        `Remarcar ${ag.paciente.nomeCompleto} para ${novoIni.toLocaleString('pt-BR')}?`,
+      )
+    )
+      return;
+    remarcar.mutate({ id: ag.id, inicio: novoIni, fim: novoFim });
+  }
 
   const { data: cfg } = useQuery({
     queryKey: ['configuracao'],
@@ -274,23 +323,41 @@ export default function AgendaSemana({
                 opacity: funciona ? 1 : 0.6,
               }}
             >
-              {/* Grid clicável */}
-              {slots.map((h, idx) => (
-                <div
-                  key={h}
-                  onClick={() => handleSlotClick(dia, h)}
-                  style={{
-                    position: 'absolute',
-                    top: idx * SLOT_MIN * PX_POR_MIN,
-                    width: '100%',
-                    height: SLOT_MIN * PX_POR_MIN,
-                    borderTop: h.endsWith(':00')
-                      ? '1px solid #cbd5e1'
-                      : '1px dashed #e2e8f0',
-                    cursor: 'pointer',
-                  }}
-                />
-              ))}
+              {/* Grid clicável + drop target */}
+              {slots.map((h, idx) => {
+                const tgtKey = `${di}:${h}`;
+                const isTarget = draggedAg && dropTarget === tgtKey;
+                return (
+                  <div
+                    key={h}
+                    onClick={() => handleSlotClick(dia, h)}
+                    onDragOver={(e) => {
+                      if (!draggedAg) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dropTarget !== tgtKey) setDropTarget(tgtKey);
+                    }}
+                    onDragLeave={() => {
+                      if (dropTarget === tgtKey) setDropTarget(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleDrop(dia, h);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: idx * SLOT_MIN * PX_POR_MIN,
+                      width: '100%',
+                      height: SLOT_MIN * PX_POR_MIN,
+                      borderTop: h.endsWith(':00')
+                        ? '1px solid #cbd5e1'
+                        : '1px dashed #e2e8f0',
+                      cursor: 'pointer',
+                      background: isTarget ? 'rgba(20, 184, 166, 0.25)' : undefined,
+                    }}
+                  />
+                );
+              })}
 
               {/* Linha hora atual */}
               {hoje && (
@@ -380,13 +447,26 @@ export default function AgendaSemana({
                 const height =
                   (fim.getTime() - ini.getTime()) / 60000 * PX_POR_MIN;
                 const cor = STATUS_COR[a.status];
+                const draggable = REMARCAVEL.includes(a.status);
+                const sendoArrastado = draggedAg?.id === a.id;
                 return (
                   <div
                     key={a.id}
+                    draggable={draggable}
+                    onDragStart={(e) => {
+                      setDraggedAg(a);
+                      e.dataTransfer.effectAllowed = 'move';
+                      e.dataTransfer.setData('text/plain', a.id);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedAg(null);
+                      setDropTarget(null);
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAgendamentoClick?.(a);
                     }}
+                    title={draggable ? 'Arraste para remarcar' : undefined}
                     style={{
                       position: 'absolute',
                       top,
@@ -399,10 +479,11 @@ export default function AgendaSemana({
                       padding: '4px 6px',
                       fontSize: 11,
                       color: cor.fg,
-                      cursor: 'pointer',
+                      cursor: draggable ? 'grab' : 'pointer',
                       overflow: 'hidden',
                       zIndex: 3,
                       boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                      opacity: sendoArrastado ? 0.4 : 1,
                     }}
                   >
                     <div style={{ fontWeight: 600 }}>
