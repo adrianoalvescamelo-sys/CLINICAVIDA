@@ -1,7 +1,8 @@
-import { FormEvent, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { FormEvent, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { criarBloqueio } from '../api/agenda';
+import { getConfiguracao } from '../api/configuracoes';
 
 interface Props {
   open: boolean;
@@ -38,15 +39,28 @@ export default function AgendaSlotModal({
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [modo, setModo] = useState<'AGENDAR' | 'BLOQUEAR'>('AGENDAR');
-  const [horaFim, setHoraFim] = useState(() => {
-    const [h, m] = hora.split(':').map(Number);
-    const d = new Date();
-    d.setHours(h, m + 15, 0, 0);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  });
+  const [horaFim, setHoraFim] = useState('');
   const [diaTodo, setDiaTodo] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+
+  const { data: cfg } = useQuery({
+    queryKey: ['configuracao'],
+    queryFn: getConfiguracao,
+    staleTime: 60_000,
+  });
+
+  // Calcula hora fim sugerida baseado em duração config (default 15min se cfg ainda não carregou)
+  useEffect(() => {
+    if (!open || !hora) return;
+    const [h, m] = hora.split(':').map(Number);
+    const duracao = cfg?.duracaoConsultaMin ?? 15;
+    const d = new Date();
+    d.setHours(h, m + duracao, 0, 0);
+    setHoraFim(
+      `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
+    );
+  }, [open, hora, cfg]);
 
   const bloquear = useMutation({
     mutationFn: criarBloqueio,
