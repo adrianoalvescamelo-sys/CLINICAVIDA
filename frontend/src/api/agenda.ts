@@ -50,6 +50,24 @@ export async function alterarStatus(
   return data.data;
 }
 
+export interface AgendamentoUpdatePayload {
+  dataHoraInicio?: string;
+  dataHoraFim?: string;
+  profissionalId?: string;
+  observacoes?: string;
+}
+
+export async function atualizarAgendamento(
+  id: string,
+  payload: AgendamentoUpdatePayload,
+) {
+  const { data } = await api.patch<Env<AgendamentoListItem>>(
+    `/agendamentos/${id}`,
+    payload,
+  );
+  return data.data;
+}
+
 export async function chamarAgendamento(id: string) {
   const { data } = await api.post<Env<AgendamentoListItem>>(
     `/agendamentos/${id}/chamar`,

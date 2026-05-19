@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   alterarStatus,
@@ -5,6 +6,7 @@ import {
   marcarAgendamentoAtendido,
 } from '../api/agenda';
 import type { AgendamentoListItem, AgendamentoStatus } from '../types/agenda';
+import AgendamentoEditarModal from './AgendamentoEditarModal';
 
 interface Props {
   agendamento: AgendamentoListItem | null;
@@ -47,6 +49,7 @@ function formatTel(d: string) {
 
 export default function AgendamentoDetalheModal({ agendamento, onClose }: Props) {
   const qc = useQueryClient();
+  const [editando, setEditando] = useState(false);
 
   const status = useMutation({
     mutationFn: ({ id, s, motivo }: { id: string; s: AgendamentoStatus; motivo?: string }) =>
@@ -101,6 +104,12 @@ export default function AgendamentoDetalheModal({ agendamento, onClose }: Props)
     'CONFIRMADO',
     'CONFIRMACAO_TARDIA',
     'AGUARDANDO',
+  ].includes(a.status);
+  const podeEditar = [
+    'SOLICITADO',
+    'PRE_AGENDAMENTO',
+    'CONFIRMADO',
+    'CONFIRMACAO_TARDIA',
   ].includes(a.status);
 
   return (
@@ -294,11 +303,28 @@ export default function AgendamentoDetalheModal({ agendamento, onClose }: Props)
               </Btn>
             </>
           )}
+          {podeEditar && (
+            <Btn
+              onClick={() => setEditando(true)}
+              color="#0f172a"
+              variant="ghost"
+            >
+              Editar
+            </Btn>
+          )}
           <Btn onClick={onClose} color="#475569" variant="ghost">
             Fechar
           </Btn>
         </div>
       </div>
+
+      {editando && (
+        <AgendamentoEditarModal
+          agendamento={a}
+          onClose={() => setEditando(false)}
+          onSaved={onClose}
+        />
+      )}
     </div>
   );
 }
