@@ -11,6 +11,7 @@ import { AuditModule } from './audit/audit.module';
 import { HealthModule } from './health/health.module';
 import { PacientesModule } from './pacientes/pacientes.module';
 import { ProfissionaisModule } from './profissionais/profissionais.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 import { AgendaModule } from './agenda/agenda.module';
 import { BotModule } from './bot/bot.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
@@ -49,6 +50,7 @@ import { ThrottlerProxyGuard } from './common/guards/throttler-proxy.guard';
     HealthModule,
     PacientesModule,
     ProfissionaisModule,
+    UsuariosModule,
     AgendaModule,
     BotModule,
     WhatsappModule,

@@ -5,6 +5,7 @@ import { logout } from '../api/auth';
 
 export default function Layout({ children }: { children: ReactNode }) {
   const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.perfil === 'ADMIN';
   const clear = useAuthStore((s) => s.clear);
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,6 +75,11 @@ export default function Layout({ children }: { children: ReactNode }) {
             <Link to="/relatorios" style={linkStyle('/relatorios')}>
               Relatórios
             </Link>
+            {isAdmin && (
+              <Link to="/usuarios" style={linkStyle('/usuarios')}>
+                Usuários
+              </Link>
+            )}
           </nav>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>

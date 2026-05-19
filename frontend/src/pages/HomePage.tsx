@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { useAuthStore } from '../store/auth';
 
 export default function HomePage() {
+  const isAdmin = useAuthStore((s) => s.user?.perfil) === 'ADMIN';
   return (
     <Layout>
       <h1 style={{ color: '#0f172a', marginTop: 0 }}>Painel</h1>
@@ -51,6 +53,14 @@ export default function HomePage() {
           enabled
         />
         <ModuleCard to="/relatorios" title="Relatórios" subtitle="Operacionais" enabled />
+        {isAdmin && (
+          <ModuleCard
+            to="/usuarios"
+            title="Usuários"
+            subtitle="Gerenciar logins"
+            enabled
+          />
+        )}
       </div>
     </Layout>
   );

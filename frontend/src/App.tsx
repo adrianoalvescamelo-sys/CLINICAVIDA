@@ -7,6 +7,10 @@ import PacienteEditarPage from './pages/PacienteEditarPage';
 import ProfissionaisListPage from './pages/ProfissionaisListPage';
 import ProfissionalNovoPage from './pages/ProfissionalNovoPage';
 import ProfissionalEditarPage from './pages/ProfissionalEditarPage';
+import UsuariosListPage from './pages/UsuariosListPage';
+import UsuarioNovoPage from './pages/UsuarioNovoPage';
+import UsuarioEditarPage from './pages/UsuarioEditarPage';
+import UsuarioResetSenhaPage from './pages/UsuarioResetSenhaPage';
 import AgendaPage from './pages/AgendaPage';
 import AgendaNovoPage from './pages/AgendaNovoPage';
 import WhatsappPendentesPage from './pages/WhatsappPendentesPage';
@@ -45,6 +49,22 @@ export default function App() {
       <Route
         path="/profissionais/:id"
         element={<RoleRoute allow={['ADMIN']}><ProfissionalEditarPage /></RoleRoute>}
+      />
+      <Route
+        path="/usuarios"
+        element={<RoleRoute allow={['ADMIN']}><UsuariosListPage /></RoleRoute>}
+      />
+      <Route
+        path="/usuarios/novo"
+        element={<RoleRoute allow={['ADMIN']}><UsuarioNovoPage /></RoleRoute>}
+      />
+      <Route
+        path="/usuarios/:id"
+        element={<RoleRoute allow={['ADMIN']}><UsuarioEditarPage /></RoleRoute>}
+      />
+      <Route
+        path="/usuarios/:id/senha"
+        element={<RoleRoute allow={['ADMIN']}><UsuarioResetSenhaPage /></RoleRoute>}
       />
       <Route
         path="/agenda/novo"
