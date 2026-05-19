@@ -12,6 +12,8 @@ import UsuarioNovoPage from './pages/UsuarioNovoPage';
 import UsuarioEditarPage from './pages/UsuarioEditarPage';
 import UsuarioResetSenhaPage from './pages/UsuarioResetSenhaPage';
 import MinhaContaPage from './pages/MinhaContaPage';
+import ListaEsperaPage from './pages/ListaEsperaPage';
+import ListaEsperaNovoPage from './pages/ListaEsperaNovoPage';
 import AgendaPage from './pages/AgendaPage';
 import AgendaNovoPage from './pages/AgendaNovoPage';
 import WhatsappPendentesPage from './pages/WhatsappPendentesPage';
@@ -70,6 +72,14 @@ export default function App() {
       <Route
         path="/minha-conta"
         element={<PrivateRoute><MinhaContaPage /></PrivateRoute>}
+      />
+      <Route
+        path="/lista-espera"
+        element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><ListaEsperaPage /></RoleRoute>}
+      />
+      <Route
+        path="/lista-espera/novo"
+        element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><ListaEsperaNovoPage /></RoleRoute>}
       />
       <Route
         path="/agenda/novo"

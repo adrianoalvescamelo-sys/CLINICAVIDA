@@ -3,7 +3,9 @@ import Layout from '../components/Layout';
 import { useAuthStore } from '../store/auth';
 
 export default function HomePage() {
-  const isAdmin = useAuthStore((s) => s.user?.perfil) === 'ADMIN';
+  const perfil = useAuthStore((s) => s.user?.perfil);
+  const isAdmin = perfil === 'ADMIN';
+  const isRecepcao = perfil === 'ADMIN' || perfil === 'RECEPCAO';
   return (
     <Layout>
       <h1 style={{ color: '#0f172a', marginTop: 0 }}>Painel</h1>
@@ -46,6 +48,14 @@ export default function HomePage() {
           subtitle="Operacao do dia"
           enabled
         />
+        {isRecepcao && (
+          <ModuleCard
+            to="/lista-espera"
+            title="Lista de espera"
+            subtitle="Fila priorizada"
+            enabled
+          />
+        )}
         <ModuleCard
           to="/painel-tv"
           title="Painel TV"

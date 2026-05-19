@@ -6,6 +6,7 @@ import { logout } from '../api/auth';
 export default function Layout({ children }: { children: ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.perfil === 'ADMIN';
+  const isRecepcao = user?.perfil === 'ADMIN' || user?.perfil === 'RECEPCAO';
   const clear = useAuthStore((s) => s.clear);
   const navigate = useNavigate();
   const location = useLocation();
@@ -69,6 +70,11 @@ export default function Layout({ children }: { children: ReactNode }) {
             <Link to="/recepcao" style={linkStyle('/recepcao')}>
               Recepcao
             </Link>
+            {isRecepcao && (
+              <Link to="/lista-espera" style={linkStyle('/lista-espera')}>
+                Lista espera
+              </Link>
+            )}
             <Link to="/painel-tv" style={linkStyle('/painel-tv')}>
               Painel TV
             </Link>
