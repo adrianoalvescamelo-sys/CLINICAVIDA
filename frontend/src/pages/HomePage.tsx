@@ -6,6 +6,10 @@ export default function HomePage() {
   const perfil = useAuthStore((s) => s.user?.perfil);
   const isAdmin = perfil === 'ADMIN';
   const isRecepcao = perfil === 'ADMIN' || perfil === 'RECEPCAO';
+  const podeBloquear =
+    perfil === 'ADMIN' ||
+    perfil === 'MEDICO' ||
+    perfil === 'PROFISSIONAL_NAO_MEDICO';
   return (
     <Layout>
       <h1 style={{ color: '#0f172a', marginTop: 0 }}>Painel</h1>
@@ -36,6 +40,14 @@ export default function HomePage() {
           subtitle="Agendamentos do dia"
           enabled
         />
+        {podeBloquear && (
+          <ModuleCard
+            to="/bloqueios"
+            title="Bloqueios"
+            subtitle="Indisponibilidade"
+            enabled
+          />
+        )}
         <ModuleCard
           to="/whatsapp"
           title="WhatsApp"

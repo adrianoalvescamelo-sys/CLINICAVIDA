@@ -63,3 +63,45 @@ export async function marcarAgendamentoAtendido(id: string) {
   );
   return data.data;
 }
+
+export interface Bloqueio {
+  id: string;
+  profissionalId: string;
+  dataHoraInicio: string;
+  dataHoraFim: string;
+  motivo: string | null;
+  createdAt: string;
+  profissional?: {
+    id: string;
+    nomeCompleto: string;
+    especialidade: string | null;
+  };
+}
+
+export interface NovoBloqueio {
+  profissionalId: string;
+  dataHoraInicio: string;
+  dataHoraFim: string;
+  motivo?: string;
+}
+
+export async function listarBloqueios(
+  profissionalId?: string,
+): Promise<Bloqueio[]> {
+  const { data } = await api.get<Env<Bloqueio[]>>('/agendamentos/bloqueios', {
+    params: profissionalId ? { profissionalId } : {},
+  });
+  return data.data;
+}
+
+export async function criarBloqueio(payload: NovoBloqueio): Promise<Bloqueio> {
+  const { data } = await api.post<Env<Bloqueio>>(
+    '/agendamentos/bloqueios',
+    payload,
+  );
+  return data.data;
+}
+
+export async function removerBloqueio(id: string): Promise<void> {
+  await api.delete(`/agendamentos/bloqueios/${id}`);
+}

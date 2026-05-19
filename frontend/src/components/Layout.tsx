@@ -7,6 +7,10 @@ export default function Layout({ children }: { children: ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.perfil === 'ADMIN';
   const isRecepcao = user?.perfil === 'ADMIN' || user?.perfil === 'RECEPCAO';
+  const podeBloquear =
+    user?.perfil === 'ADMIN' ||
+    user?.perfil === 'MEDICO' ||
+    user?.perfil === 'PROFISSIONAL_NAO_MEDICO';
   const clear = useAuthStore((s) => s.clear);
   const navigate = useNavigate();
   const location = useLocation();
@@ -64,6 +68,11 @@ export default function Layout({ children }: { children: ReactNode }) {
             <Link to="/agenda" style={linkStyle('/agenda')}>
               Agenda
             </Link>
+            {podeBloquear && (
+              <Link to="/bloqueios" style={linkStyle('/bloqueios')}>
+                Bloqueios
+              </Link>
+            )}
             <Link to="/whatsapp" style={linkStyle('/whatsapp')}>
               WhatsApp
             </Link>
