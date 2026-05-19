@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { atualizarAgendamento } from '../api/agenda';
 import { listProfissionais } from '../api/profissionais';
 import type { AgendamentoListItem } from '../types/agenda';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface Props {
   agendamento: AgendamentoListItem | null;
@@ -44,6 +45,8 @@ export default function AgendamentoEditarModal({
   onSaved,
 }: Props) {
   const qc = useQueryClient();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalA11y(!!agendamento, onClose, dialogRef);
 
   const { data: profissionais } = useQuery({
     queryKey: ['profissionais', true],
@@ -134,6 +137,9 @@ export default function AgendamentoEditarModal({
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: '#fff',

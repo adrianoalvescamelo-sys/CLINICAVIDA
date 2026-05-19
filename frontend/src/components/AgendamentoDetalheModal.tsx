@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   alterarStatus,
@@ -7,6 +7,7 @@ import {
 } from '../api/agenda';
 import type { AgendamentoListItem, AgendamentoStatus } from '../types/agenda';
 import AgendamentoEditarModal from './AgendamentoEditarModal';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface Props {
   agendamento: AgendamentoListItem | null;
@@ -50,6 +51,8 @@ function formatTel(d: string) {
 export default function AgendamentoDetalheModal({ agendamento, onClose }: Props) {
   const qc = useQueryClient();
   const [editando, setEditando] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalA11y(!!agendamento && !editando, onClose, dialogRef);
 
   const status = useMutation({
     mutationFn: ({ id, s, motivo }: { id: string; s: AgendamentoStatus; motivo?: string }) =>
@@ -126,6 +129,9 @@ export default function AgendamentoDetalheModal({ agendamento, onClose }: Props)
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: '#fff',

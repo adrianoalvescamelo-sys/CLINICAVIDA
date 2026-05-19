@@ -1,8 +1,9 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { criarBloqueio } from '../api/agenda';
 import { getConfiguracao } from '../api/configuracoes';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface Props {
   open: boolean;
@@ -38,6 +39,8 @@ export default function AgendaSlotModal({
 }: Props) {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalA11y(open, onClose, dialogRef);
   const [modo, setModo] = useState<'AGENDAR' | 'BLOQUEAR'>('AGENDAR');
   const [horaFim, setHoraFim] = useState('');
   const [diaTodo, setDiaTodo] = useState(false);
@@ -126,6 +129,9 @@ export default function AgendaSlotModal({
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: '#fff',

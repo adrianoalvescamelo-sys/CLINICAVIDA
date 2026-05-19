@@ -1,5 +1,7 @@
+import { useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { removerBloqueio, type Bloqueio } from '../api/agenda';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface Props {
   bloqueio: Bloqueio | null;
@@ -8,6 +10,8 @@ interface Props {
 
 export default function BloqueioDetalheModal({ bloqueio, onClose }: Props) {
   const qc = useQueryClient();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalA11y(!!bloqueio, onClose, dialogRef);
 
   const remover = useMutation({
     mutationFn: removerBloqueio,
@@ -42,6 +46,9 @@ export default function BloqueioDetalheModal({ bloqueio, onClose }: Props) {
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: '#fff',
