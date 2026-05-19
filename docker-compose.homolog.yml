@@ -1,0 +1,99 @@
+# docker-compose.homolog.yml
+# Stack homolog: postgres + api + frontend (nginx static + proxy /api)
+# SSL Let's Encrypt feito pelo nginx HOST do servidor (certbot), que faz
+# proxy_pass para a porta exposta deste container nginx (8080).
+#
+# Uso:
+#   1. cp .env.homolog.example .env.homolog && editar secrets
+#   2. docker compose --env-file .env.homolog -f docker-compose.homolog.yml up -d --build
+#   3. configurar nginx HOST (ver docs/deploy-homolog.md)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: clinicavida-postgres-homolog
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-clinicavida}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # NÃO exposto pra host — só acessível via network interna
+    networks:
+      - clinicavida-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-clinicavida}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: clinicavida-api-homolog
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-clinicavida}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      AUTH_MAX_ATTEMPTS: ${AUTH_MAX_ATTEMPTS:-5}
+      AUTH_LOCKOUT_MINUTES: ${AUTH_LOCKOUT_MINUTES:-15}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      BOT_SECRET: ${BOT_SECRET}
+      TV_SECRET: ${TV_SECRET}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      N8N_TIMEOUT_MS: ${N8N_TIMEOUT_MS:-10000}
+      WA_ENABLED: ${WA_ENABLED:-false}
+      WA_DRY_RUN: ${WA_DRY_RUN:-true}
+      WA_MAX_TENTATIVAS: ${WA_MAX_TENTATIVAS:-3}
+      WA_CONFIRMACAO_HORAS: ${WA_CONFIRMACAO_HORAS:-24}
+      WA_LEMBRETE_HORAS: ${WA_LEMBRETE_HORAS:-2}
+      WA_LIMITE_AUTO_HORAS: ${WA_LIMITE_AUTO_HORAS:-2}
+    networks:
+      - clinicavida-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: clinicavida-frontend-homolog
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    # Porta 8080 do host — nginx HOST faz proxy_pass HTTPS → http://127.0.0.1:8080
+    ports:
+      - "127.0.0.1:8080:80"
+    networks:
+      - clinicavida-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health-nginx"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  clinicavida-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    name: clinicavida-postgres-homolog-data
