@@ -179,6 +179,9 @@
           "Chamar paciente no painel",
           "Confirmar atendimento realizado",
           "Na Fase 2, acessar prontuário e documentos médicos"
+        ],
+        "restricoes": [
+          "Não gerencia nem visualiza lista de espera (operação de recepção)"
         ]
       },
       {
@@ -192,7 +195,8 @@
         "restricoes": [
           "Não prescreve como médico",
           "Não gera receita médica",
-          "Não gera atestado médico"
+          "Não gera atestado médico",
+          "Não gerencia nem visualiza lista de espera (operação de recepção)"
         ]
       }
     ],

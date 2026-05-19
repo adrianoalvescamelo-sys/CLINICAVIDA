@@ -77,9 +77,11 @@ Financeiro, fluxo de caixa, pagamentos, faturamento, cobrança, telemedicina, po
 
 ## Perfis
 - **Admin geral**: tudo.
-- **Recepção**: cadastro, agenda, WhatsApp, confirmações. SEM prontuário.
-- **Médico**: própria agenda, todos os dados do paciente, painel chamada, Fase 2 prontuário.
-- **Profissional não médico**: própria agenda, dados básicos. SEM receita/atestado.
+- **Recepção**: cadastro, agenda, WhatsApp, confirmações, lista de espera. SEM prontuário.
+- **Médico**: própria agenda, todos os dados do paciente, painel chamada, Fase 2 prontuário. SEM lista de espera.
+- **Profissional não médico**: própria agenda, dados básicos. SEM receita/atestado, SEM lista de espera.
+
+> Lista de espera é operação de recepção (decisão PO 2026-05-18). Endpoint `/api/lista-espera` restrito a `ADMIN+RECEPCAO`.
 
 ## Definition of Done (todas as features)
 - Steps verificáveis concluídos.
