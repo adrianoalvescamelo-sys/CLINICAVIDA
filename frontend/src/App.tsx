@@ -4,6 +4,9 @@ import HomePage from './pages/HomePage';
 import PacientesListPage from './pages/PacientesListPage';
 import PacienteNovoPage from './pages/PacienteNovoPage';
 import PacienteEditarPage from './pages/PacienteEditarPage';
+import ProfissionaisListPage from './pages/ProfissionaisListPage';
+import ProfissionalNovoPage from './pages/ProfissionalNovoPage';
+import ProfissionalEditarPage from './pages/ProfissionalEditarPage';
 import AgendaPage from './pages/AgendaPage';
 import AgendaNovoPage from './pages/AgendaNovoPage';
 import WhatsappPendentesPage from './pages/WhatsappPendentesPage';
@@ -28,12 +31,21 @@ export default function App() {
       <Route path="/recepcao" element={<PrivateRoute><RecepcaoPage /></PrivateRoute>} />
       <Route path="/pacientes" element={<PrivateRoute><PacientesListPage /></PrivateRoute>} />
       <Route path="/painel-tv" element={<PrivateRoute><PainelTVPage /></PrivateRoute>} />
+      <Route path="/profissionais" element={<PrivateRoute><ProfissionaisListPage /></PrivateRoute>} />
 
       <Route
         path="/pacientes/novo"
         element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><PacienteNovoPage /></RoleRoute>}
       />
       <Route path="/pacientes/:id" element={<PrivateRoute><PacienteEditarPage /></PrivateRoute>} />
+      <Route
+        path="/profissionais/novo"
+        element={<RoleRoute allow={['ADMIN']}><ProfissionalNovoPage /></RoleRoute>}
+      />
+      <Route
+        path="/profissionais/:id"
+        element={<RoleRoute allow={['ADMIN']}><ProfissionalEditarPage /></RoleRoute>}
+      />
       <Route
         path="/agenda/novo"
         element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><AgendaNovoPage /></RoleRoute>}

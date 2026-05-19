@@ -21,6 +21,12 @@ export default function HomePage() {
           enabled
         />
         <ModuleCard
+          to="/profissionais"
+          title="Profissionais"
+          subtitle="Médicos e equipe"
+          enabled
+        />
+        <ModuleCard
           to="/agenda"
           title="Agenda"
           subtitle="Agendamentos do dia"
