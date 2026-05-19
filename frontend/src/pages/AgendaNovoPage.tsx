@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Layout from '../components/Layout';
 import { criarAgendamento, listProfissionais } from '../api/agenda';
@@ -8,11 +8,14 @@ import type { TipoAtendimento } from '../types/agenda';
 
 export default function AgendaNovoPage() {
   const navigate = useNavigate();
+  const [search] = useSearchParams();
   const [pacienteQ, setPacienteQ] = useState('');
   const [pacienteId, setPacienteId] = useState('');
-  const [profissionalId, setProfissionalId] = useState('');
-  const [data, setData] = useState('');
-  const [horaIni, setHoraIni] = useState('09:00');
+  const [profissionalId, setProfissionalId] = useState(
+    search.get('profissionalId') ?? '',
+  );
+  const [data, setData] = useState(search.get('data') ?? '');
+  const [horaIni, setHoraIni] = useState(search.get('hora') ?? '09:00');
   const [duracao, setDuracao] = useState(30);
   const [tipo, setTipo] = useState<TipoAtendimento>('CONSULTA');
   const [encaixe, setEncaixe] = useState(false);
