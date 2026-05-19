@@ -32,9 +32,10 @@ COPY backend/package*.json ./backend/
 # Install production deps only
 RUN npm ci --workspace backend --omit=dev
 
-# Copy built output and Prisma
+# Copy built output and Prisma generated client
+# Em workspace npm, `prisma generate` coloca o client em /app/node_modules/.prisma
 COPY --from=builder /app/backend/dist ./backend/dist
-COPY --from=builder /app/backend/node_modules/.prisma ./backend/node_modules/.prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY backend/prisma ./backend/prisma
 
 # Create non-root user
