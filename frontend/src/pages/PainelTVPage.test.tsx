@@ -96,7 +96,7 @@ describe('PainelTVPage', () => {
 
     await screen.findByText(/aguardando chamada/i, {}, { timeout: 3000 });
     expect(
-      screen.getByText(/sem paciente em atendimento/i),
+      screen.getByText(/nenhum paciente sendo chamado/i),
     ).toBeInTheDocument();
   });
 
@@ -124,7 +124,7 @@ describe('PainelTVPage', () => {
     await screen.findByText(/sem pacientes aguardando/i, {}, { timeout: 3000 });
   });
 
-  it('links operacionais para /agenda e /recepcao', async () => {
+  it('hist órico vazio mostra "Nenhum chamado anterior"', async () => {
     vi.spyOn(recepcaoApi, 'obterPainelTV').mockResolvedValue({
       chamadoAgora: null,
       proximos: [],
@@ -133,10 +133,6 @@ describe('PainelTVPage', () => {
 
     renderPage();
 
-    const agenda = await screen.findByRole('link', { name: /agenda do dia/i });
-    expect(agenda).toHaveAttribute('href', '/agenda');
-
-    const recepcao = screen.getByRole('link', { name: /ver recepção/i });
-    expect(recepcao).toHaveAttribute('href', '/recepcao');
+    await screen.findByText(/nenhum chamado anterior/i, {}, { timeout: 3000 });
   });
 });

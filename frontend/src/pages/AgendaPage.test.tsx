@@ -23,13 +23,17 @@ function renderPage() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const result = render(
     <MemoryRouter>
       <QueryClientProvider client={qc}>
         <AgendaPage />
       </QueryClientProvider>
     </MemoryRouter>,
   );
+  // Default agora é SEMANA — força vista "Dia" para os testes de tabela
+  const tabDia = screen.getByRole('button', { name: /^dia$/i });
+  fireEvent.click(tabDia);
+  return result;
 }
 
 const baseAg = {
