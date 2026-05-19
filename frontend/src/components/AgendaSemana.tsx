@@ -5,6 +5,7 @@ import {
   listarBloqueios,
   type Bloqueio,
 } from '../api/agenda';
+import { getConfiguracao } from '../api/configuracoes';
 import type { AgendamentoListItem, AgendamentoStatus } from '../types/agenda';
 import AgendaSlotModal from './AgendaSlotModal';
 import BloqueioDetalheModal from './BloqueioDetalheModal';
@@ -16,10 +17,13 @@ interface Props {
   onAgendamentoClick?: (a: AgendamentoListItem) => void;
 }
 
-const HORA_INI = 7;
-const HORA_FIM = 19;
 const SLOT_MIN = 15;
 const PX_POR_MIN = 1.4; // 15min ≈ 21px
+
+function parseHoraToMin(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
 
 const STATUS_COR: Record<AgendamentoStatus, { bg: string; border: string; fg: string }> =
   {
@@ -60,10 +64,6 @@ function minDeMeiaNoite(d: Date) {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-function pxPosicao(min: number) {
-  return (min - HORA_INI * 60) * PX_POR_MIN;
-}
-
 function dataParaIsoDia(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -83,6 +83,26 @@ export default function AgendaSemana({
   const [bloqueioSelecionado, setBloqueioSelecionado] = useState<Bloqueio | null>(
     null,
   );
+
+  const { data: cfg } = useQuery({
+    queryKey: ['configuracao'],
+    queryFn: getConfiguracao,
+    staleTime: 60_000,
+  });
+
+  const horaIniMin = cfg ? parseHoraToMin(cfg.horaAbertura) : 7 * 60;
+  const horaFimMin = cfg ? parseHoraToMin(cfg.horaFechamento) : 19 * 60;
+  const diasFunc = cfg?.diasFuncionamento ?? [1, 2, 3, 4, 5, 6];
+  const almocoIniMin = cfg?.intervaloAlmocoIni
+    ? parseHoraToMin(cfg.intervaloAlmocoIni)
+    : null;
+  const almocoFimMin = cfg?.intervaloAlmocoFim
+    ? parseHoraToMin(cfg.intervaloAlmocoFim)
+    : null;
+
+  function pxPosicao(min: number) {
+    return (min - horaIniMin) * PX_POR_MIN;
+  }
 
   const dias = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
@@ -122,15 +142,15 @@ export default function AgendaSemana({
 
   const slots = useMemo(() => {
     const arr: string[] = [];
-    for (let h = HORA_INI; h < HORA_FIM; h++) {
-      for (let m = 0; m < 60; m += SLOT_MIN) {
-        arr.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-      }
+    for (let t = horaIniMin; t < horaFimMin; t += SLOT_MIN) {
+      const h = Math.floor(t / 60);
+      const m = t % 60;
+      arr.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }
     return arr;
-  }, []);
+  }, [horaIniMin, horaFimMin]);
 
-  const alturaTotal = (HORA_FIM - HORA_INI) * 60 * PX_POR_MIN;
+  const alturaTotal = (horaFimMin - horaIniMin) * PX_POR_MIN;
 
   const agora = new Date();
 
@@ -180,19 +200,24 @@ export default function AgendaSemana({
         <div style={{ ...headerStyle, borderRight: '1px solid #e2e8f0' }}></div>
         {dias.map((d, i) => {
           const hoje = isMesmoDia(d, agora);
+          const funciona = diasFunc.includes(d.getDay());
           return (
             <div
               key={i}
               style={{
                 ...headerStyle,
                 borderRight: '1px solid #e2e8f0',
-                background: hoje ? '#ccfbf1' : '#f8fafc',
+                background: hoje ? '#ccfbf1' : funciona ? '#f8fafc' : '#e2e8f0',
+                opacity: funciona ? 1 : 0.65,
               }}
             >
               <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
                 {DIAS_LABEL[i]}
               </div>
               <div style={{ fontSize: 12, color: '#64748b' }}>{fmtDataBR(d)}</div>
+              {!funciona && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>(fechado)</div>
+              )}
             </div>
           );
         })}
@@ -233,6 +258,7 @@ export default function AgendaSemana({
           const dayAgs = agendamentosDoDia(dia);
           const dayBls = bloqueiosDoDia(dia);
           const hoje = isMesmoDia(dia, agora);
+          const funciona = diasFunc.includes(dia.getDay());
           return (
             <div
               key={di}
@@ -240,7 +266,12 @@ export default function AgendaSemana({
                 borderRight: '1px solid #e2e8f0',
                 position: 'relative',
                 height: alturaTotal,
-                background: hoje ? '#fefce8' : '#fff',
+                background: !funciona
+                  ? 'repeating-linear-gradient(45deg, #f1f5f9 0 8px, #e2e8f0 8px 16px)'
+                  : hoje
+                    ? '#fefce8'
+                    : '#fff',
+                opacity: funciona ? 1 : 0.6,
               }}
             >
               {/* Grid clicável */}
@@ -276,14 +307,35 @@ export default function AgendaSemana({
                 />
               )}
 
+              {/* Faixa almoço */}
+              {almocoIniMin !== null && almocoFimMin !== null && (
+                <div
+                  title="Horário de almoço"
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    top: pxPosicao(almocoIniMin),
+                    height: (almocoFimMin - almocoIniMin) * PX_POR_MIN,
+                    background: 'rgba(241,245,249,0.7)',
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                  }}
+                />
+              )}
+
               {/* Bloqueios */}
               {dayBls.map((b) => {
                 const ini = new Date(b.dataHoraInicio);
                 const fim = new Date(b.dataHoraFim);
                 const diaIni = new Date(dia);
-                diaIni.setHours(HORA_INI, 0, 0, 0);
+                const horaIni = Math.floor(horaIniMin / 60);
+                const minIni = horaIniMin % 60;
+                diaIni.setHours(horaIni, minIni, 0, 0);
                 const diaFim = new Date(dia);
-                diaFim.setHours(HORA_FIM, 0, 0, 0);
+                const horaFim = Math.floor(horaFimMin / 60);
+                const minFim = horaFimMin % 60;
+                diaFim.setHours(horaFim, minFim, 0, 0);
                 const clampedIni = ini < diaIni ? diaIni : ini;
                 const clampedFim = fim > diaFim ? diaFim : fim;
                 const top = pxPosicao(minDeMeiaNoite(clampedIni));

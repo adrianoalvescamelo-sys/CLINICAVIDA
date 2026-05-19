@@ -8,20 +8,38 @@ datasource db {
 }
 
 model Usuario {
-  id              String      @id @default(uuid()) @db.Uuid
-  email           String      @unique
-  senhaHash       String      @map("senha_hash")
-  nomeCompleto    String      @map("nome_completo")
+  id              String         @id @default(uuid()) @db.Uuid
+  email           String         @unique
+  senhaHash       String         @map("senha_hash")
+  nomeCompleto    String         @map("nome_completo")
   perfil          PerfilTipo
-  ativo           Boolean     @default(true)
-  tentativasLogin Int         @default(0) @map("tentativas_login")
-  bloqueadoAte    DateTime?   @map("bloqueado_ate")
-  ultimoLoginEm   DateTime?   @map("ultimo_login_em")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  ativo           Boolean        @default(true)
+  tentativasLogin Int            @default(0) @map("tentativas_login")
+  bloqueadoAte    DateTime?      @map("bloqueado_ate")
+  ultimoLoginEm   DateTime?      @map("ultimo_login_em")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
   auditorias      Auditoria[]
+  refreshTokens   RefreshToken[]
 
   @@map("usuarios")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  usuarioId  String    @map("usuario_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by") @db.Uuid
+  ip         String?
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
 
 model Paciente {
@@ -218,6 +236,22 @@ model Auditoria {
   @@index([dataHora])
   @@index([traceId])
   @@map("auditoria")
+}
+
+model ConfiguracaoClinica {
+  id                  String   @id @default(uuid()) @db.Uuid
+  nomeClinica         String   @default("Clínica Vida Popular") @map("nome_clinica")
+  horaAbertura        String   @default("07:00") @map("hora_abertura") @db.VarChar(5)
+  horaFechamento      String   @default("19:00") @map("hora_fechamento") @db.VarChar(5)
+  diasFuncionamento   Int[]    @default([1, 2, 3, 4, 5, 6]) @map("dias_funcionamento")
+  duracaoConsultaMin  Int      @default(30) @map("duracao_consulta_min")
+  intervaloAlmocoIni  String?  @map("intervalo_almoco_ini") @db.VarChar(5)
+  intervaloAlmocoFim  String?  @map("intervalo_almoco_fim") @db.VarChar(5)
+  timezone            String   @default("America/Cuiaba")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  atualizadoPor       String?  @map("atualizado_por") @db.Uuid
+
+  @@map("configuracoes_clinica")
 }
 
 enum PerfilTipo {

@@ -83,6 +83,14 @@ export default function HomePage() {
             enabled
           />
         )}
+        {isAdmin && (
+          <ModuleCard
+            to="/configuracoes"
+            title="Configurações"
+            subtitle="Horários e parâmetros"
+            enabled
+          />
+        )}
       </div>
     </Layout>
   );
