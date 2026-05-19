@@ -56,6 +56,9 @@ export default function Layout({ children }: { children: ReactNode }) {
             <Link to="/pacientes" style={linkStyle('/pacientes')}>
               Pacientes
             </Link>
+            <Link to="/profissionais" style={linkStyle('/profissionais')}>
+              Profissionais
+            </Link>
             <Link to="/agenda" style={linkStyle('/agenda')}>
               Agenda
             </Link>
