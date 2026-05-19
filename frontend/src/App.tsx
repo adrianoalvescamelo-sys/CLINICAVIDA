@@ -11,6 +11,7 @@ import UsuariosListPage from './pages/UsuariosListPage';
 import UsuarioNovoPage from './pages/UsuarioNovoPage';
 import UsuarioEditarPage from './pages/UsuarioEditarPage';
 import UsuarioResetSenhaPage from './pages/UsuarioResetSenhaPage';
+import MinhaContaPage from './pages/MinhaContaPage';
 import AgendaPage from './pages/AgendaPage';
 import AgendaNovoPage from './pages/AgendaNovoPage';
 import WhatsappPendentesPage from './pages/WhatsappPendentesPage';
@@ -65,6 +66,10 @@ export default function App() {
       <Route
         path="/usuarios/:id/senha"
         element={<RoleRoute allow={['ADMIN']}><UsuarioResetSenhaPage /></RoleRoute>}
+      />
+      <Route
+        path="/minha-conta"
+        element={<PrivateRoute><MinhaContaPage /></PrivateRoute>}
       />
       <Route
         path="/agenda/novo"

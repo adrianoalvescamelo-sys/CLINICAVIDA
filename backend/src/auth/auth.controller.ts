@@ -12,6 +12,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
+import { TrocarSenhaDto } from './dto/trocar-senha.dto';
 import { Public } from '../common/decorators/public.decorator';
 import {
   CurrentUser,
@@ -73,6 +74,24 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async me(@CurrentUser() user: AuthUser) {
     return user;
+  }
+
+  @Post('trocar-senha')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async trocarSenha(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: TrocarSenhaDto,
+    @Req() req: Request,
+  ) {
+    const ip = this.getIp(req);
+    const traceId = (req as any).trace_id;
+    await this.auth.trocarSenhaPropria(
+      user.id,
+      dto.senhaAtual,
+      dto.novaSenha,
+      ip,
+      traceId,
+    );
   }
 
   private getIp(req: Request): string {

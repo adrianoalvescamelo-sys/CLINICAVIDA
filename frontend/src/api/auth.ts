@@ -38,3 +38,10 @@ export async function refreshTokens(refreshToken: string) {
 export async function logout(refreshToken?: string) {
   await api.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {});
 }
+
+export async function trocarSenha(payload: {
+  senhaAtual: string;
+  novaSenha: string;
+}) {
+  await api.post('/auth/trocar-senha', payload);
+}

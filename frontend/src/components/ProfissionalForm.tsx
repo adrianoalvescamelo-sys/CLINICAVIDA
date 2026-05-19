@@ -1,4 +1,6 @@
 import { FormEvent, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { listUsuarios } from '../api/usuarios';
 import type {
   ProfissionalFormData,
   ProfissionalUpdateData,
@@ -45,6 +47,11 @@ export default function ProfissionalForm({
   });
   const [erro, setErro] = useState<string | null>(null);
   const [erroDetalhes, setErroDetalhes] = useState<unknown>(null);
+
+  const { data: usuarios } = useQuery({
+    queryKey: ['usuarios-para-vinculo'],
+    queryFn: listUsuarios,
+  });
 
   function set<K extends keyof ProfissionalUpdateData>(
     key: K,
@@ -200,13 +207,19 @@ export default function ProfissionalForm({
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>UUID usuário vinculado (opcional)</label>
-        <input
+        <label style={labelStyle}>Usuário vinculado (opcional)</label>
+        <select
           value={form.usuarioId ?? ''}
           onChange={(e) => set('usuarioId', e.target.value)}
-          placeholder="UUID do usuário (login). Deixe vazio se não houver."
           style={inputStyle}
-        />
+        >
+          <option value="">— Sem vínculo —</option>
+          {usuarios?.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.nomeCompleto} ({u.email}) · {u.perfil}
+            </option>
+          ))}
+        </select>
         <small style={{ color: '#64748b' }}>
           Vincula esse profissional a um login. Cada usuário só pode estar
           ligado a um profissional.

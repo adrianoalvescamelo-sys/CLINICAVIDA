@@ -83,9 +83,18 @@ export default function Layout({ children }: { children: ReactNode }) {
           </nav>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 13, color: '#64748b' }}>
+          <Link
+            to="/minha-conta"
+            style={{
+              fontSize: 13,
+              color: '#0f766e',
+              textDecoration: 'none',
+              fontWeight: 500,
+            }}
+            title="Minha conta"
+          >
             {user?.nomeCompleto} · {user?.perfil}
-          </span>
+          </Link>
           <button
             onClick={handleLogout}
             style={{

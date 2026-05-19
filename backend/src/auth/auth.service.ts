@@ -348,6 +348,72 @@ export class AuthService {
     return newPair;
   }
 
+  async trocarSenhaPropria(
+    usuarioId: string,
+    senhaAtual: string,
+    novaSenha: string,
+    ip: string,
+    traceId: string,
+  ): Promise<void> {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+    });
+    if (!usuario) {
+      throw new UnauthorizedException({
+        code: 'USUARIO_NAO_ENCONTRADO',
+        message: 'Usuário não encontrado',
+      });
+    }
+
+    const ok = await argon2.verify(usuario.senhaHash, senhaAtual);
+    if (!ok) {
+      await this.audit.log({
+        usuarioId,
+        acao: 'SENHA_TROCA_PROPRIA',
+        entidade: 'Usuario',
+        registroId: usuarioId,
+        ipDispositivo: ip,
+        resultado: AuditResultado.FALHA,
+        traceId,
+        detalhes: { motivo: 'senha_atual_incorreta' },
+      });
+      throw new UnauthorizedException({
+        code: 'SENHA_ATUAL_INVALIDA',
+        message: 'Senha atual incorreta',
+      });
+    }
+
+    if (senhaAtual === novaSenha) {
+      throw new UnauthorizedException({
+        code: 'SENHA_IGUAL_ATUAL',
+        message: 'Nova senha não pode ser igual à atual',
+      });
+    }
+
+    const senhaHash = await argon2.hash(novaSenha, { type: argon2.argon2id });
+
+    await this.prisma.$transaction([
+      this.prisma.usuario.update({
+        where: { id: usuarioId },
+        data: { senhaHash, tentativasLogin: 0, bloqueadoAte: null },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { usuarioId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.audit.log({
+      usuarioId,
+      acao: 'SENHA_TROCA_PROPRIA',
+      entidade: 'Usuario',
+      registroId: usuarioId,
+      ipDispositivo: ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId,
+    });
+  }
+
   async logout(
     usuarioId: string,
     ip: string,
