@@ -7,6 +7,7 @@ import {
 } from '../api/agenda';
 import type { AgendamentoListItem, AgendamentoStatus } from '../types/agenda';
 import AgendaSlotModal from './AgendaSlotModal';
+import BloqueioDetalheModal from './BloqueioDetalheModal';
 
 interface Props {
   semanaInicio: Date; // domingo da semana
@@ -79,6 +80,9 @@ export default function AgendaSemana({
   const [modalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState('');
   const [modalHora, setModalHora] = useState('');
+  const [bloqueioSelecionado, setBloqueioSelecionado] = useState<Bloqueio | null>(
+    null,
+  );
 
   const dias = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
@@ -290,7 +294,11 @@ export default function AgendaSemana({
                 return (
                   <div
                     key={b.id}
-                    title={b.motivo ?? 'Bloqueado'}
+                    title={b.motivo ?? 'Bloqueado — clique para gerenciar'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBloqueioSelecionado(b);
+                    }}
                     style={{
                       position: 'absolute',
                       top,
@@ -303,8 +311,8 @@ export default function AgendaSemana({
                       padding: 4,
                       fontSize: 11,
                       color: '#475569',
-                      pointerEvents: 'none',
-                      zIndex: 1,
+                      cursor: 'pointer',
+                      zIndex: 2,
                     }}
                   >
                     {b.motivo ?? 'Bloqueado'}
@@ -380,6 +388,11 @@ export default function AgendaSemana({
         profissionalId={profissionalId}
         profissionalNome={profissionalNome}
         onClose={() => setModalOpen(false)}
+      />
+
+      <BloqueioDetalheModal
+        bloqueio={bloqueioSelecionado}
+        onClose={() => setBloqueioSelecionado(null)}
       />
     </div>
   );
