@@ -163,7 +163,7 @@ docker compose logs -f api               # acompanhar API
 
 `DATABASE_URL`, `JWT_SECRET` (≥32 chars), `JWT_REFRESH_SECRET` (≥32 chars), `CORS_ORIGIN`, `BOT_SECRET`, `TV_SECRET` (≥16 chars).
 
-Opcionais com defaults: `PORT=3000`, `JWT_EXPIRES_IN=15m`, `JWT_REFRESH_EXPIRES_IN=7d`, `AUTH_MAX_ATTEMPTS=5`, `AUTH_LOCKOUT_MINUTES=15`, `LOG_LEVEL=info`, `N8N_WEBHOOK_URL`, `N8N_TIMEOUT_MS=10000`, `WA_ENABLED=true`, `WA_DRY_RUN=false`, `WA_MAX_TENTATIVAS=3`, `WA_CONFIRMACAO_HORAS=24`, `WA_LEMBRETE_HORAS=2`, `WA_LIMITE_AUTO_HORAS=2`.
+Opcionais com defaults: `PORT=3000`, `JWT_EXPIRES_IN=15m`, `JWT_REFRESH_EXPIRES_IN=7d`, `AUTH_MAX_ATTEMPTS=5`, `AUTH_LOCKOUT_MINUTES=15`, `LOG_LEVEL=info`, `N8N_WEBHOOK_URL`, `N8N_TIMEOUT_MS=10000`, `WA_ENABLED=true`, `WA_DRY_RUN=false`, `WA_ALLOWLIST` (vazio=sem restrição; só-dígitos vírgula, casa por sufixo — rollout gradual, ver `docs/runbook-whatsapp.md`), `WA_MAX_TENTATIVAS=3`, `WA_CONFIRMACAO_HORAS=24`, `WA_LEMBRETE_HORAS=2`, `WA_LIMITE_AUTO_HORAS=2`.
 
 Frontend opcional: `VITE_API_URL=http://localhost:3000` (proxy alvo; Vite já faz proxy de `/api` em dev).
 

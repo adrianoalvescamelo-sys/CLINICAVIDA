@@ -29,6 +29,13 @@ export default () => ({
     limiteAutoHoras: parseInt(process.env.WA_LIMITE_AUTO_HORAS ?? '2', 10),
     enabled: (process.env.WA_ENABLED ?? 'true').toLowerCase() === 'true',
     dryRun: (process.env.WA_DRY_RUN ?? 'false').toLowerCase() === 'true',
+    // Lista de números (só dígitos) que recebem envio real durante rollout gradual.
+    // Vazio = sem restrição (todos elegíveis recebem, sujeito a dryRun global).
+    // Preenchido = apenas estes recebem real; demais são forçados a dry-run.
+    allowlist: (process.env.WA_ALLOWLIST ?? '')
+      .split(',')
+      .map((n) => n.replace(/\D/g, ''))
+      .filter((n) => n.length > 0),
   },
 });
 

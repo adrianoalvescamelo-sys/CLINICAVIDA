@@ -123,6 +123,7 @@ function makeConfigMock(overrides: Record<string, unknown> = {}) {
     'whatsapp.n8nTimeoutMs': 10_000,
     'whatsapp.maxTentativas': 3,
     'whatsapp.limiteAutoHoras': 2,
+    'whatsapp.allowlist': [],
     ...overrides,
   };
   return {
@@ -441,6 +442,78 @@ describe('WhatsappService', () => {
       const call1 = prisma.mensagemWhatsapp.update.mock.calls[0][0];
       const retryEm1 = call1.data.proximoRetryEm as Date;
       expect(retryEm1.getTime()).toBeGreaterThan(retryEm0.getTime());
+    });
+
+    // ── allowlist (rollout gradual) ──────────────────────────────────────────
+
+    async function rebuildService() {
+      const module = await Test.createTestingModule({
+        providers: [
+          WhatsappService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: HttpService, useValue: http },
+          { provide: ConfigService, useValue: config },
+          { provide: AuditService, useValue: audit },
+        ],
+      }).compile();
+      return module.get<WhatsappService>(WhatsappService);
+    }
+
+    it('allowlist preenchida + número FORA: força dry-run, não chama HTTP, marca ENVIADA', async () => {
+      config = makeConfigMock({ 'whatsapp.allowlist': ['66988887777'] });
+      service = await rebuildService();
+
+      const msg = makeMensagem({ telefone: '66999991111' }); // fora da allowlist
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+
+      await service.enviar(UUID_MSG);
+
+      expect(http.post).not.toHaveBeenCalled();
+      expect(prisma.mensagemWhatsapp.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: MensagemStatus.ENVIADA }),
+        }),
+      );
+    });
+
+    it('allowlist preenchida + número DENTRO: envia real via HTTP', async () => {
+      config = makeConfigMock({ 'whatsapp.allowlist': ['66999991111'] });
+      service = await rebuildService();
+
+      const msg = makeMensagem({ telefone: '66999991111' });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      http.post.mockReturnValue(of({ data: { ok: true }, status: 200 }));
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+
+      await service.enviar(UUID_MSG);
+
+      expect(http.post).toHaveBeenCalled();
+    });
+
+    it('allowlist casa por sufixo (com/sem DDI): 5566999991111 cobre 66999991111', async () => {
+      config = makeConfigMock({ 'whatsapp.allowlist': ['5566999991111'] });
+      service = await rebuildService();
+
+      const msg = makeMensagem({ telefone: '66999991111' });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      http.post.mockReturnValue(of({ data: { ok: true }, status: 200 }));
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+
+      await service.enviar(UUID_MSG);
+
+      expect(http.post).toHaveBeenCalled();
+    });
+
+    it('allowlist vazia: comportamento normal (envia para qualquer número)', async () => {
+      const msg = makeMensagem({ telefone: '66999991111' });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      http.post.mockReturnValue(of({ data: { ok: true }, status: 200 }));
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+
+      await service.enviar(UUID_MSG);
+
+      expect(http.post).toHaveBeenCalled();
     });
 
     it('mensagem com status FALHA também é re-enviada', async () => {

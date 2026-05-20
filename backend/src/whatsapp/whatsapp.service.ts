@@ -85,7 +85,18 @@ export class WhatsappService {
     const maxTentativas = this.config.get<number>('whatsapp.maxTentativas')!;
     const webhookUrl = this.config.get<string>('whatsapp.n8nWebhookUrl')!;
     const timeoutMs = this.config.get<number>('whatsapp.n8nTimeoutMs')!;
-    const dryRun = this.config.get<boolean>('whatsapp.dryRun');
+    const dryRunGlobal = this.config.get<boolean>('whatsapp.dryRun');
+    const allowlist = this.config.get<string[]>('whatsapp.allowlist') ?? [];
+
+    // Rollout gradual: com allowlist preenchida, só números listados recebem
+    // envio real; os demais são forçados a dry-run (loga, não envia).
+    const telDigitos = msg.telefone.replace(/\D/g, '');
+    const bloqueadoPorAllowlist =
+      allowlist.length > 0 &&
+      !allowlist.some(
+        (a) => telDigitos.endsWith(a) || a.endsWith(telDigitos),
+      );
+    const dryRun = dryRunGlobal || bloqueadoPorAllowlist;
 
     const payload = msg.payload as { texto: string; vars?: unknown };
     const body = {
@@ -100,7 +111,16 @@ export class WhatsappService {
     try {
       if (dryRun || !webhookUrl) {
         this.logger.log(
-          { msgId: msg.id, dryRun: true, body },
+          {
+            msgId: msg.id,
+            dryRun: true,
+            motivoDryRun: bloqueadoPorAllowlist
+              ? 'allowlist'
+              : dryRunGlobal
+                ? 'global'
+                : 'sem-webhook',
+            body,
+          },
           'WhatsApp DRY-RUN — pulando envio HTTP',
         );
       } else {
