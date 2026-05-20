@@ -6,6 +6,7 @@ O sistema e uma PWA (Progressive Web App) para gestao de pacientes, agendamentos
 
 Especificacao do produto: [`SPEC_App_Clinica_Vida_revisada.json`](./SPEC_App_Clinica_Vida_revisada.json) (v1.1, 2026-05-14).
 Guia de orquestracao e decisoes de negocio: [`CLAUDE.md`](./CLAUDE.md).
+Manual operacional para usuario final (recepcao/admin/medico): [`docs/MANUAL_USUARIO.md`](./docs/MANUAL_USUARIO.md).
 
 ---
 
