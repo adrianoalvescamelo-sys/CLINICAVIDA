@@ -30,7 +30,9 @@ COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 
 EXPOSE 80
 
+# 127.0.0.1 (não "localhost"): em alpine localhost resolve ::1 (IPv6) primeiro,
+# mas nginx faz "listen 80" só em IPv4 → wget daria Connection refused.
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost/health-nginx || exit 1
+  CMD wget -qO- http://127.0.0.1/health-nginx || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
