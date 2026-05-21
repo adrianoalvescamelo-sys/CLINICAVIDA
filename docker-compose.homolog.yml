@@ -85,7 +85,9 @@ services:
     networks:
       - clinicavida-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health-nginx"]
+      # 127.0.0.1 (não localhost): nginx faz "listen 80" só IPv4; em alpine
+      # localhost resolve ::1 primeiro → wget daria Connection refused.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health-nginx"]
       interval: 30s
       timeout: 5s
       retries: 3
