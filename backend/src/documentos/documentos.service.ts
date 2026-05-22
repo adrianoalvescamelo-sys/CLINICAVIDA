@@ -207,4 +207,32 @@ export class DocumentosService {
 
     return doc;
   }
+
+  async baixarPdf(id: string, user: AuthUser, ip: string, trace: string) {
+    const doc = await this.prisma.documentoMedico.findUnique({
+      where: { id },
+      select: { id: true, autorUsuarioId: true, tipo: true, pdf: true },
+    });
+    if (
+      !doc ||
+      (!this.isMedicoOuAdmin(user) && doc.autorUsuarioId !== user.id)
+    ) {
+      throw new NotFoundException({
+        code: 'DOCUMENTO_NAO_ENCONTRADO',
+        message: 'Documento não encontrado',
+      });
+    }
+
+    await this.audit.log({
+      usuarioId: user.id,
+      acao: 'DOWNLOAD_DOCUMENTO',
+      entidade: 'DocumentoMedico',
+      registroId: doc.id,
+      ipDispositivo: ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: trace,
+    });
+
+    return { pdf: doc.pdf as Buffer, tipo: doc.tipo };
+  }
 }

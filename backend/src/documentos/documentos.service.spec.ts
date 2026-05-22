@@ -196,4 +196,37 @@ describe('DocumentosService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('baixarPdf', () => {
+    it('retorna pdf+tipo e audita DOWNLOAD_DOCUMENTO', async () => {
+      const pdf = Buffer.from('%PDF-1.3 fake');
+      prisma.documentoMedico.findUnique.mockResolvedValue({
+        id: DOC,
+        autorUsuarioId: MEDICO.id,
+        tipo: TipoDocumento.RECEITA,
+        pdf,
+      });
+      const r = await service.baixarPdf(DOC, MEDICO as never, 'ip', 't');
+      expect(r.pdf).toBe(pdf);
+      expect(r.tipo).toBe(TipoDocumento.RECEITA);
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          acao: 'DOWNLOAD_DOCUMENTO',
+          registroId: DOC,
+        }),
+      );
+    });
+
+    it('não-médico baixando doc de outro → 404', async () => {
+      prisma.documentoMedico.findUnique.mockResolvedValue({
+        id: DOC,
+        autorUsuarioId: 'outro',
+        tipo: TipoDocumento.RECEITA,
+        pdf: Buffer.from('x'),
+      });
+      await expect(
+        service.baixarPdf(DOC, NAOMED as never, 'ip', 't'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
 });
