@@ -1,5 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuditResultado } from '@prisma/client';
 import { ProntuarioService } from './prontuario.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -210,6 +215,71 @@ describe('ProntuarioService', () => {
       prisma.evolucao.findUnique.mockResolvedValue(null);
       await expect(
         service.obterEvolucao(EVO, MEDICO as never, 'ip', 't'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('retificar', () => {
+    const dto = { subjetivo: 's2', objetivo: 'o2', avaliacao: 'a2', plano: 'p2' };
+
+    it('cria nova versão com replacesId e versao+1, audita', async () => {
+      prisma.evolucao.findUnique.mockResolvedValue({
+        id: EVO,
+        prontuarioId: PRONT,
+        agendamentoId: AG,
+        autorUsuarioId: MEDICO.id,
+        autorEhMedico: true,
+        versao: 1,
+        replacedBy: null,
+      });
+      prisma.evolucao.create.mockResolvedValue({ id: 'nova', versao: 2, replacesId: EVO });
+
+      const r = await service.retificar(EVO, dto as never, MEDICO as never, 'ip', 't');
+
+      expect(prisma.evolucao.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            replacesId: EVO,
+            versao: 2,
+            prontuarioId: PRONT,
+            autorUsuarioId: MEDICO.id,
+          }),
+        }),
+      );
+      expect(r.versao).toBe(2);
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ acao: 'RETIFICACAO_EVOLUCAO' }),
+      );
+    });
+
+    it('retificar de outro autor: 403', async () => {
+      prisma.evolucao.findUnique.mockResolvedValue({
+        id: EVO,
+        autorUsuarioId: 'outro',
+        versao: 1,
+        replacedBy: null,
+      });
+      await expect(
+        service.retificar(EVO, dto as never, MEDICO as never, 'ip', 't'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('retificar versão já substituída: 409', async () => {
+      prisma.evolucao.findUnique.mockResolvedValue({
+        id: EVO,
+        autorUsuarioId: MEDICO.id,
+        versao: 1,
+        replacedBy: { id: 'nova' },
+      });
+      await expect(
+        service.retificar(EVO, dto as never, MEDICO as never, 'ip', 't'),
+      ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('evolução inexistente: 404', async () => {
+      prisma.evolucao.findUnique.mockResolvedValue(null);
+      await expect(
+        service.retificar(EVO, dto as never, MEDICO as never, 'ip', 't'),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });

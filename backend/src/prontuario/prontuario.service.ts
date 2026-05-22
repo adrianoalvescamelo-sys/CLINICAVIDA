@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { CriarEvolucaoDto } from './dto/criar-evolucao.dto';
+import { RetificarEvolucaoDto } from './dto/retificar-evolucao.dto';
 
 @Injectable()
 export class ProntuarioService {
@@ -158,5 +161,70 @@ export class ProntuarioService {
     });
 
     return evolucao;
+  }
+
+  async retificar(
+    evolucaoId: string,
+    dto: RetificarEvolucaoDto,
+    user: AuthUser,
+    ip: string,
+    trace: string,
+  ) {
+    const orig = await this.prisma.evolucao.findUnique({
+      where: { id: evolucaoId },
+      include: { replacedBy: true },
+    });
+    if (!orig) {
+      throw new NotFoundException({
+        code: 'EVOLUCAO_NAO_ENCONTRADA',
+        message: 'Evolução não encontrada',
+      });
+    }
+    if (orig.autorUsuarioId !== user.id) {
+      throw new ForbiddenException({
+        code: 'NAO_AUTOR',
+        message: 'Apenas o autor pode retificar a evolução',
+      });
+    }
+    if (orig.replacedBy) {
+      throw new ConflictException({
+        code: 'VERSAO_NAO_ATUAL',
+        message: 'Esta evolução já foi retificada',
+      });
+    }
+
+    const nova = await this.prisma.$transaction((tx) =>
+      tx.evolucao.create({
+        data: {
+          prontuarioId: orig.prontuarioId,
+          agendamentoId: orig.agendamentoId,
+          autorUsuarioId: orig.autorUsuarioId,
+          autorEhMedico: orig.autorEhMedico,
+          queixaPrincipal: dto.queixaPrincipal,
+          subjetivo: dto.subjetivo,
+          objetivo: dto.objetivo,
+          avaliacao: dto.avaliacao,
+          plano: dto.plano,
+          versao: orig.versao + 1,
+          replacesId: orig.id,
+        },
+      }),
+    );
+
+    await this.audit.log({
+      usuarioId: user.id,
+      acao: 'RETIFICACAO_EVOLUCAO',
+      entidade: 'Evolucao',
+      registroId: nova.id,
+      ipDispositivo: ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: trace,
+      detalhes: {
+        retificaId: orig.id,
+        versao: nova.versao,
+      } as Prisma.InputJsonValue,
+    });
+
+    return nova;
   }
 }
