@@ -19,6 +19,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ListaEsperaModule } from './lista-espera/lista-espera.module';
 import { RecepcaoModule } from './recepcao/recepcao.module';
 import { RelatoriosModule } from './relatorios/relatorios.module';
+import { ProntuarioModule } from './prontuario/prontuario.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TraceIdMiddleware } from './common/middleware/trace-id.middleware';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -59,6 +60,7 @@ import { ThrottlerProxyGuard } from './common/guards/throttler-proxy.guard';
     ListaEsperaModule,
     RecepcaoModule,
     RelatoriosModule,
+    ProntuarioModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },

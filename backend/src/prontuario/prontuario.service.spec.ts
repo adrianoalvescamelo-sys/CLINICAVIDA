@@ -68,10 +68,20 @@ describe('ProntuarioService', () => {
 
   describe('criarEvolucao', () => {
     it('cria evolução vinculada ao agendamento do paciente, autor=usuário, audita', async () => {
-      prisma.agendamento.findUnique.mockResolvedValue({ id: AG, pacienteId: PAC });
+      prisma.agendamento.findUnique.mockResolvedValue({
+        id: AG,
+        pacienteId: PAC,
+      });
       prisma.profissional.findUnique.mockResolvedValue({ ehMedico: true });
-      prisma.prontuario.findUnique.mockResolvedValue({ id: PRONT, pacienteId: PAC });
-      prisma.evolucao.create.mockResolvedValue({ id: EVO, prontuarioId: PRONT, versao: 1 });
+      prisma.prontuario.findUnique.mockResolvedValue({
+        id: PRONT,
+        pacienteId: PAC,
+      });
+      prisma.evolucao.create.mockResolvedValue({
+        id: EVO,
+        prontuarioId: PRONT,
+        versao: 1,
+      });
 
       const dto = {
         agendamentoId: AG,
@@ -109,11 +119,21 @@ describe('ProntuarioService', () => {
     });
 
     it('cria prontuário lazy quando ainda não existe', async () => {
-      prisma.agendamento.findUnique.mockResolvedValue({ id: AG, pacienteId: PAC });
+      prisma.agendamento.findUnique.mockResolvedValue({
+        id: AG,
+        pacienteId: PAC,
+      });
       prisma.profissional.findUnique.mockResolvedValue({ ehMedico: false });
       prisma.prontuario.findUnique.mockResolvedValue(null);
-      prisma.prontuario.create.mockResolvedValue({ id: PRONT, pacienteId: PAC });
-      prisma.evolucao.create.mockResolvedValue({ id: EVO, prontuarioId: PRONT, versao: 1 });
+      prisma.prontuario.create.mockResolvedValue({
+        id: PRONT,
+        pacienteId: PAC,
+      });
+      prisma.evolucao.create.mockResolvedValue({
+        id: EVO,
+        prontuarioId: PRONT,
+        versao: 1,
+      });
 
       await service.criarEvolucao(
         PAC,
@@ -137,7 +157,10 @@ describe('ProntuarioService', () => {
     });
 
     it('rejeita quando agendamento não pertence ao paciente (400)', async () => {
-      prisma.agendamento.findUnique.mockResolvedValue({ id: AG, pacienteId: 'outro' });
+      prisma.agendamento.findUnique.mockResolvedValue({
+        id: AG,
+        pacienteId: 'outro',
+      });
       await expect(
         service.criarEvolucao(
           PAC,
@@ -159,7 +182,10 @@ describe('ProntuarioService', () => {
 
   describe('listarProntuario', () => {
     it('médico vê todas as evoluções atuais e audita visualização', async () => {
-      prisma.prontuario.findUnique.mockResolvedValue({ id: PRONT, pacienteId: PAC });
+      prisma.prontuario.findUnique.mockResolvedValue({
+        id: PRONT,
+        pacienteId: PAC,
+      });
       prisma.evolucao.findMany.mockResolvedValue([{ id: EVO }]);
 
       const r = await service.listarProntuario(PAC, MEDICO as never, 'ip', 't');
@@ -167,7 +193,10 @@ describe('ProntuarioService', () => {
       expect(r.evolucoes).toHaveLength(1);
       expect(prisma.evolucao.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ prontuarioId: PRONT, replacedBy: null }),
+          where: expect.objectContaining({
+            prontuarioId: PRONT,
+            replacedBy: null,
+          }),
         }),
       );
       const whereArg = prisma.evolucao.findMany.mock.calls[0][0].where;
@@ -178,7 +207,10 @@ describe('ProntuarioService', () => {
     });
 
     it('não-médico só vê as próprias evoluções (filtro autorUsuarioId)', async () => {
-      prisma.prontuario.findUnique.mockResolvedValue({ id: PRONT, pacienteId: PAC });
+      prisma.prontuario.findUnique.mockResolvedValue({
+        id: PRONT,
+        pacienteId: PAC,
+      });
       prisma.evolucao.findMany.mockResolvedValue([]);
 
       await service.listarProntuario(PAC, NAOMED as never, 'ip', 't');
@@ -196,16 +228,25 @@ describe('ProntuarioService', () => {
 
   describe('obterEvolucao', () => {
     it('retorna evolução e audita VISUALIZACAO_EVOLUCAO', async () => {
-      prisma.evolucao.findUnique.mockResolvedValue({ id: EVO, autorUsuarioId: MEDICO.id });
+      prisma.evolucao.findUnique.mockResolvedValue({
+        id: EVO,
+        autorUsuarioId: MEDICO.id,
+      });
       const r = await service.obterEvolucao(EVO, MEDICO as never, 'ip', 't');
       expect(r.id).toBe(EVO);
       expect(audit.log).toHaveBeenCalledWith(
-        expect.objectContaining({ acao: 'VISUALIZACAO_EVOLUCAO', registroId: EVO }),
+        expect.objectContaining({
+          acao: 'VISUALIZACAO_EVOLUCAO',
+          registroId: EVO,
+        }),
       );
     });
 
     it('não-médico tentando ler evolução de outro: 404', async () => {
-      prisma.evolucao.findUnique.mockResolvedValue({ id: EVO, autorUsuarioId: 'outro' });
+      prisma.evolucao.findUnique.mockResolvedValue({
+        id: EVO,
+        autorUsuarioId: 'outro',
+      });
       await expect(
         service.obterEvolucao(EVO, NAOMED as never, 'ip', 't'),
       ).rejects.toBeInstanceOf(NotFoundException);
@@ -220,7 +261,12 @@ describe('ProntuarioService', () => {
   });
 
   describe('retificar', () => {
-    const dto = { subjetivo: 's2', objetivo: 'o2', avaliacao: 'a2', plano: 'p2' };
+    const dto = {
+      subjetivo: 's2',
+      objetivo: 'o2',
+      avaliacao: 'a2',
+      plano: 'p2',
+    };
 
     it('cria nova versão com replacesId e versao+1, audita', async () => {
       prisma.evolucao.findUnique.mockResolvedValue({
@@ -232,9 +278,19 @@ describe('ProntuarioService', () => {
         versao: 1,
         replacedBy: null,
       });
-      prisma.evolucao.create.mockResolvedValue({ id: 'nova', versao: 2, replacesId: EVO });
+      prisma.evolucao.create.mockResolvedValue({
+        id: 'nova',
+        versao: 2,
+        replacesId: EVO,
+      });
 
-      const r = await service.retificar(EVO, dto as never, MEDICO as never, 'ip', 't');
+      const r = await service.retificar(
+        EVO,
+        dto as never,
+        MEDICO as never,
+        'ip',
+        't',
+      );
 
       expect(prisma.evolucao.create).toHaveBeenCalledWith(
         expect.objectContaining({
