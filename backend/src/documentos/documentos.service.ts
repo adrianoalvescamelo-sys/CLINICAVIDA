@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { AuditResultado, Prisma, TipoDocumento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -138,6 +139,70 @@ export class DocumentosService {
       resultado: AuditResultado.SUCESSO,
       traceId: trace,
       detalhes: { tipo: dto.tipo, pacienteId } as Prisma.InputJsonValue,
+    });
+
+    return doc;
+  }
+
+  private readonly metaSelect = {
+    id: true,
+    tipo: true,
+    conteudo: true,
+    pacienteId: true,
+    autorUsuarioId: true,
+    autorEhMedico: true,
+    agendamentoId: true,
+    createdAt: true,
+  };
+
+  async listar(pacienteId: string, user: AuthUser, ip: string, trace: string) {
+    const where: Prisma.DocumentoMedicoWhereInput = { pacienteId };
+    if (!this.isMedicoOuAdmin(user)) {
+      where.autorUsuarioId = user.id;
+    }
+    const docs = await this.prisma.documentoMedico.findMany({
+      where,
+      select: this.metaSelect,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    await this.audit.log({
+      usuarioId: user.id,
+      acao: 'VISUALIZACAO_DOCUMENTO',
+      entidade: 'DocumentoMedico',
+      registroId: null,
+      ipDispositivo: ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: trace,
+      detalhes: { pacienteId } as Prisma.InputJsonValue,
+    });
+
+    return docs;
+  }
+
+  async obter(id: string, user: AuthUser, ip: string, trace: string) {
+    const doc = await this.prisma.documentoMedico.findUnique({
+      where: { id },
+      select: this.metaSelect,
+    });
+    if (
+      !doc ||
+      (!this.isMedicoOuAdmin(user) && doc.autorUsuarioId !== user.id)
+    ) {
+      throw new NotFoundException({
+        code: 'DOCUMENTO_NAO_ENCONTRADO',
+        message: 'Documento não encontrado',
+      });
+    }
+
+    await this.audit.log({
+      usuarioId: user.id,
+      acao: 'VISUALIZACAO_DOCUMENTO',
+      entidade: 'DocumentoMedico',
+      registroId: doc.id,
+      ipDispositivo: ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: trace,
     });
 
     return doc;

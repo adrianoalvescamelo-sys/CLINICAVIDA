@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuditResultado, TipoDocumento } from '@prisma/client';
 import { DocumentosService } from './documentos.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -142,6 +146,54 @@ describe('DocumentosService', () => {
           't',
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+  });
+
+  describe('listar', () => {
+    it('médico lista todos do paciente (sem filtro de autor) e audita', async () => {
+      prisma.documentoMedico.findMany.mockResolvedValue([{ id: DOC }]);
+      const r = await service.listar(PAC, MEDICO as never, 'ip', 't');
+      expect(r).toHaveLength(1);
+      const whereArg = prisma.documentoMedico.findMany.mock.calls[0][0].where;
+      expect(whereArg.pacienteId).toBe(PAC);
+      expect(whereArg.autorUsuarioId).toBeUndefined();
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ acao: 'VISUALIZACAO_DOCUMENTO' }),
+      );
+    });
+
+    it('não-médico lista só os próprios (filtro autorUsuarioId)', async () => {
+      prisma.documentoMedico.findMany.mockResolvedValue([]);
+      await service.listar(PAC, NAOMED as never, 'ip', 't');
+      const whereArg = prisma.documentoMedico.findMany.mock.calls[0][0].where;
+      expect(whereArg.autorUsuarioId).toBe(NAOMED.id);
+    });
+  });
+
+  describe('obter', () => {
+    it('retorna metadados (sem pdf) e audita', async () => {
+      prisma.documentoMedico.findUnique.mockResolvedValue({
+        id: DOC,
+        autorUsuarioId: MEDICO.id,
+      });
+      const r = await service.obter(DOC, MEDICO as never, 'ip', 't');
+      expect(r.id).toBe(DOC);
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          acao: 'VISUALIZACAO_DOCUMENTO',
+          registroId: DOC,
+        }),
+      );
+    });
+
+    it('não-médico obtendo doc de outro → 404', async () => {
+      prisma.documentoMedico.findUnique.mockResolvedValue({
+        id: DOC,
+        autorUsuarioId: 'outro',
+      });
+      await expect(
+        service.obter(DOC, NAOMED as never, 'ip', 't'),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });
