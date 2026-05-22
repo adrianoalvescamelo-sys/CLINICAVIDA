@@ -61,6 +61,9 @@ services:
       WA_LIMITE_AUTO_HORAS: ${WA_LIMITE_AUTO_HORAS:-2}
     networks:
       - clinicavida-net
+      # rede do n8n (stack n8n-upbl) — backend posta no webhook outbound via DNS
+      # interno (URL pública dá hairpin NAT/HTTP 000). Ver docs/n8n/README-fase2.md
+      - n8n-net
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/ready"]
       interval: 15s
@@ -95,6 +98,10 @@ services:
 networks:
   clinicavida-net:
     driver: bridge
+  # rede externa criada pela stack n8n-upbl; precisa existir antes do up
+  n8n-net:
+    external: true
+    name: n8n-upbl_default
 
 volumes:
   postgres-data:

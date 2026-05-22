@@ -1,0 +1,61 @@
+{
+  "name": "clinicavida-inbound",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clinicavida-inbound",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook-evo",
+      "name": "Webhook (da Evolution)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "clinicavida-inbound"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evolution MESSAGES_UPSERT -> extrai resposta de paciente.\n// Webhook envolve payload em .body.\nconst b = $input.first().json.body || {};\nif (b.event !== 'messages.upsert') return [];\nconst d = b.data || {};\nif (!d.key || d.key.fromMe) return []; // ignora mensagens enviadas por nos\nconst msg = d.message || {};\nconst texto = msg.conversation\n  || (msg.extendedTextMessage && msg.extendedTextMessage.text)\n  || '';\nif (!texto) return []; // ignora midia/sem texto\nconst jid = d.key.remoteJid || '';\nconst telefone = jid.replace(/@.*$/, '').replace(/\\D/g, '');\nif (!telefone) return [];\nreturn [{ json: { telefone, texto, providerMsgId: d.key.id || '' } }];"
+      },
+      "id": "extract",
+      "name": "Extrair resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://clinicavida-api-homolog:3000/api/bot/whatsapp/inbound",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-bot-secret", "value": "8b8b759deeed9b75383f5d2e6a03b368238350ac04d5a0a9" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"telefone\": \"{{ $json.telefone }}\",\n  \"texto\": {{ JSON.stringify($json.texto) }},\n  \"providerMsgId\": \"{{ $json.providerMsgId }}\"\n}",
+        "options": {}
+      },
+      "id": "cb-inbound",
+      "name": "Inbound -> backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Webhook (da Evolution)": {
+      "main": [[{ "node": "Extrair resposta", "type": "main", "index": 0 }]]
+    },
+    "Extrair resposta": {
+      "main": [[{ "node": "Inbound -> backend", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}
