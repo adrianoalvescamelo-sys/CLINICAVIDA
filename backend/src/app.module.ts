@@ -20,6 +20,7 @@ import { ListaEsperaModule } from './lista-espera/lista-espera.module';
 import { RecepcaoModule } from './recepcao/recepcao.module';
 import { RelatoriosModule } from './relatorios/relatorios.module';
 import { ProntuarioModule } from './prontuario/prontuario.module';
+import { DocumentosModule } from './documentos/documentos.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TraceIdMiddleware } from './common/middleware/trace-id.middleware';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -61,6 +62,7 @@ import { ThrottlerProxyGuard } from './common/guards/throttler-proxy.guard';
     RecepcaoModule,
     RelatoriosModule,
     ProntuarioModule,
+    DocumentosModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
