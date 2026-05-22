@@ -19,9 +19,10 @@ export default function WhatsappPendentesPage() {
   const qc = useQueryClient();
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['wa-pendentes'],
-    queryFn: listPendentes,
+    queryFn: () => listPendentes(),
     refetchInterval: 30_000,
   });
+  const items = data?.items ?? [];
 
   async function handleReenviar(id: string) {
     await reenviar(id);
@@ -54,7 +55,7 @@ export default function WhatsappPendentesPage() {
 
       {isLoading && <p>Carregando…</p>}
 
-      {data && data.length === 0 && (
+      {data && items.length === 0 && (
         <div
           style={{
             background: '#fff',
@@ -68,7 +69,7 @@ export default function WhatsappPendentesPage() {
         </div>
       )}
 
-      {data && data.length > 0 && (
+      {data && items.length > 0 && (
         <div
           style={{
             background: '#fff',
@@ -90,7 +91,7 @@ export default function WhatsappPendentesPage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((m) => {
+              {items.map((m) => {
                 const sc = statusColor(m.status);
                 return (
                   <tr key={m.id} style={{ borderTop: '1px solid #e2e8f0' }}>

@@ -1,19 +1,24 @@
-import { FormEvent, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Layout from '../components/Layout';
 import { criarAgendamento, listProfissionais } from '../api/agenda';
 import { listPacientes } from '../api/pacientes';
+import { getConfiguracao } from '../api/configuracoes';
 import type { TipoAtendimento } from '../types/agenda';
 
 export default function AgendaNovoPage() {
   const navigate = useNavigate();
+  const [search] = useSearchParams();
   const [pacienteQ, setPacienteQ] = useState('');
   const [pacienteId, setPacienteId] = useState('');
-  const [profissionalId, setProfissionalId] = useState('');
-  const [data, setData] = useState('');
-  const [horaIni, setHoraIni] = useState('09:00');
+  const [profissionalId, setProfissionalId] = useState(
+    search.get('profissionalId') ?? '',
+  );
+  const [data, setData] = useState(search.get('data') ?? '');
+  const [horaIni, setHoraIni] = useState(search.get('hora') ?? '09:00');
   const [duracao, setDuracao] = useState(30);
+  const [duracaoTocada, setDuracaoTocada] = useState(false);
   const [tipo, setTipo] = useState<TipoAtendimento>('CONSULTA');
   const [encaixe, setEncaixe] = useState(false);
   const [obs, setObs] = useState('');
@@ -24,6 +29,19 @@ export default function AgendaNovoPage() {
     queryKey: ['profissionais'],
     queryFn: () => listProfissionais(true),
   });
+
+  const { data: cfg } = useQuery({
+    queryKey: ['configuracao'],
+    queryFn: getConfiguracao,
+    staleTime: 60_000,
+  });
+
+  // Aplica duração default da config se usuário ainda não mexeu manualmente
+  useEffect(() => {
+    if (cfg && !duracaoTocada) {
+      setDuracao(cfg.duracaoConsultaMin);
+    }
+  }, [cfg, duracaoTocada]);
 
   const { data: pacientes } = useQuery({
     queryKey: ['busca-pacientes', pacienteQ],
@@ -48,8 +66,10 @@ export default function AgendaNovoPage() {
         observacoes: obs || undefined,
       });
       navigate('/agenda');
-    } catch (err: any) {
-      const apiErr = err?.response?.data?.error;
+    } catch (err) {
+      const apiErr = (err as {
+        response?: { data?: { error?: { message?: string | string[] } } };
+      })?.response?.data?.error;
       setErro(
         Array.isArray(apiErr?.message)
           ? apiErr.message.join(', ')
@@ -186,7 +206,10 @@ export default function AgendaNovoPage() {
               min={5}
               max={240}
               value={duracao}
-              onChange={(e) => setDuracao(Number(e.target.value))}
+              onChange={(e) => {
+                setDuracao(Number(e.target.value));
+                setDuracaoTocada(true);
+              }}
               style={inputStyle}
             />
           </div>

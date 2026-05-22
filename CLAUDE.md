@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # App Clínica Vida — Guia de Orquestração
 
 Aplicativo interno da **Clínica Vida Popular — Sinop/MT**. Uso exclusivo da clínica, não SaaS.
@@ -73,9 +77,11 @@ Financeiro, fluxo de caixa, pagamentos, faturamento, cobrança, telemedicina, po
 
 ## Perfis
 - **Admin geral**: tudo.
-- **Recepção**: cadastro, agenda, WhatsApp, confirmações. SEM prontuário.
-- **Médico**: própria agenda, todos os dados do paciente, painel chamada, Fase 2 prontuário.
-- **Profissional não médico**: própria agenda, dados básicos. SEM receita/atestado.
+- **Recepção**: cadastro, agenda, WhatsApp, confirmações, lista de espera. SEM prontuário.
+- **Médico**: própria agenda, todos os dados do paciente, painel chamada, Fase 2 prontuário. SEM lista de espera.
+- **Profissional não médico**: própria agenda, dados básicos. SEM receita/atestado, SEM lista de espera.
+
+> Lista de espera é operação de recepção (decisão PO 2026-05-18). Endpoint `/api/lista-espera` restrito a `ADMIN+RECEPCAO`.
 
 ## Definition of Done (todas as features)
 - Steps verificáveis concluídos.
@@ -90,12 +96,119 @@ Financeiro, fluxo de caixa, pagamentos, faturamento, cobrança, telemedicina, po
 
 ## Modelo de dados resumo
 
-**pacientes**: id, nome_completo, cpf (UNIQUE), data_nascimento, telefone_whatsapp, updated_at.
+**usuarios**: id (UUID), email (UNIQUE), senha_hash (argon2), nome_completo, perfil (ADMIN|RECEPCAO|MEDICO|PROFISSIONAL_NAO_MEDICO), ativo, tentativas_login, bloqueado_ate.
 
-**agendamentos**: id, paciente_id, profissional_id, data_hora_inicio, data_hora_fim, status, origem.
-Statuses: solicitado, pre_agendamento, confirmado, confirmacao_tardia, aguardando, em_atendimento, atendido, faltou, cancelado.
+**pacientes**: id, cpf (UNIQUE, 11 chars), nome_completo, data_nascimento, sexo, telefone_whatsapp, telefone_secundario?, email?, responsavel_nome?, responsavel_cpf?, endereco (JSON)?, deleted_at (soft delete). Índices: nome_completo, telefone_whatsapp.
 
-**mensagens_whatsapp**: id, paciente_id, agendamento_id, tipo, status, tentativas, event_id (UNIQUE).
-Statuses: pendente, enviada, entregue, respondida, falha, cancelada.
+**profissionais**: id, nome_completo, especialidade?, registro_conselho?, eh_medico (bool), ativo, usuario_id? (UNIQUE FK → usuarios), cor (#RRGGBB)?.
 
-**auditoria**: id, usuario_id, acao, entidade, registro_id, data_hora, ip_dispositivo, resultado, trace_id.
+**agendamentos**: id, paciente_id, profissional_id, data_hora_inicio, data_hora_fim, tipo (CONSULTA|RETORNO|EXAME|PROCEDIMENTO|OUTRO), status, origem (RECEPCAO|ADMIN|BOT_WHATSAPP|PACIENTE_WHATSAPP), encaixe (bool), event_id (UNIQUE idempotência).
+Statuses: SOLICITADO, PRE_AGENDAMENTO, CONFIRMADO, CONFIRMACAO_TARDIA, AGUARDANDO, EM_ATENDIMENTO, ATENDIDO, FALTOU, CANCELADO.
+
+**bloqueios_agenda**: id, profissional_id, data_hora_inicio, data_hora_fim, motivo?.
+
+**lista_espera**: id, paciente_id, profissional_id?, especialidade?, prioridade (int), melhores_horarios (JSON)?, status (ATIVO|CONTATADO|RECUSADO|AGENDADO|CANCELADO).
+
+**mensagens_whatsapp**: id, paciente_id?, agendamento_id?, telefone, direcao (OUTBOUND|INBOUND), tipo, status, tentativas, proximo_retry_em?, payload (JSON), event_id (UNIQUE).
+Statuses: PENDENTE, ENVIADA, ENTREGUE, RESPONDIDA, FALHA, CANCELADA.
+Tipos: CONFIRMACAO_24H, LEMBRETE_2H, CONFIRMACAO_TARDIA, CANCELAMENTO, REMARCACAO, VAGA_LIBERADA, CUSTOM.
+
+**pacientes_historico** / **agendamentos_historico**: trilha de auditoria por entidade; armazenam `diff` (JSON), `status_anterior`, `status_novo`, `trace_id`.
+
+**auditoria**: id, usuario_id?, acao, entidade, registro_id?, data_hora, ip_dispositivo?, resultado (SUCESSO|FALHA|NEGADO), trace_id, detalhes (JSON)?.
+
+## Comandos de desenvolvimento
+
+### Setup inicial
+```bash
+# Start DB
+npm run dev:db
+
+# Run migrations + seed
+npm --workspace backend run prisma:migrate
+npm --workspace backend run seed
+```
+
+### Backend (NestJS)
+```bash
+npm run dev:backend          # watch mode, porta 3000
+npm --workspace backend test                    # unit tests (Jest)
+npm --workspace backend run test:e2e            # e2e tests (requer DB rodando)
+npm --workspace backend run test:cov            # coverage
+npm --workspace backend run lint                # ESLint --fix
+npm --workspace backend run prisma:studio       # GUI do banco
+
+# Rodar um único arquivo de teste
+npm --workspace backend test -- --testPathPattern=pacientes.service
+npm --workspace backend run test:e2e -- --testPathPattern=auth
+```
+
+### Frontend (Vite + React)
+```bash
+npm run dev:frontend         # porta 5173
+npm --workspace frontend test            # Vitest (run)
+npm --workspace frontend run test:watch  # watch mode
+npm --workspace frontend run lint        # ESLint max-warnings 0
+npm --workspace frontend run build       # tsc + vite build
+```
+
+### Build completo + Docker
+```bash
+npm run build                            # backend + frontend
+docker compose up -d                     # postgres + api
+docker compose logs -f api               # acompanhar API
+```
+
+## Variáveis de ambiente obrigatórias (backend)
+
+`DATABASE_URL`, `JWT_SECRET` (≥32 chars), `JWT_REFRESH_SECRET` (≥32 chars), `CORS_ORIGIN`, `BOT_SECRET`, `TV_SECRET` (≥16 chars).
+
+Opcionais com defaults: `PORT=3000`, `JWT_EXPIRES_IN=15m`, `JWT_REFRESH_EXPIRES_IN=7d`, `AUTH_MAX_ATTEMPTS=5`, `AUTH_LOCKOUT_MINUTES=15`, `LOG_LEVEL=info`, `N8N_WEBHOOK_URL`, `N8N_TIMEOUT_MS=10000`, `WA_ENABLED=true`, `WA_DRY_RUN=false`, `WA_ALLOWLIST` (vazio=sem restrição; só-dígitos vírgula, casa por sufixo — rollout gradual, ver `docs/runbook-whatsapp.md`), `WA_MAX_TENTATIVAS=3`, `WA_CONFIRMACAO_HORAS=24`, `WA_LEMBRETE_HORAS=2`, `WA_LIMITE_AUTO_HORAS=2`.
+
+Frontend opcional: `VITE_API_URL=http://localhost:3000` (proxy alvo; Vite já faz proxy de `/api` em dev).
+
+## Arquitetura
+
+### Backend — NestJS monólito modular
+
+Cada feature é um módulo independente em `backend/src/<feature>/`:
+- `auth/` — JWT access token (15 min) + refresh token (7 dias), argon2, bloqueio por tentativas. Guards: `JwtAuthGuard` (global via APP_GUARD), `RolesGuard` (global via APP_GUARD), `BotAuthGuard` (header `x-bot-secret`), `TvAuthGuard` (header `x-tv-secret`).
+- `pacientes/` — CRUD + soft delete + histórico de alterações em `pacientes_historico`.
+- `agenda/` — agendamentos, bloqueios por profissional, detecção de conflitos, encaixe manual.
+- `bot/` — endpoint público para pré-agendamento via WhatsApp (autenticado por `BOT_SECRET`).
+- `profissionais/` — CRUD de profissionais; vínculo 1:1 opcional com `Usuario` via `usuarioId`; campo `ehMedico` controla permissões de prontuário/receita.
+- `whatsapp/` — envio via n8n/Evolution API, retry com backoff, cron jobs em `whatsapp.cron.ts` (`@nestjs/schedule`), idempotência por `event_id`.
+- `lista-espera/` — fila priorizada para recepcao.
+- `recepcao/` — dashboard do dia + painel TV (autenticado por `TV_SECRET`).
+- `config/` — `configuration.ts`, wiring do `ConfigModule` com variáveis de ambiente.
+- `relatorios/` — agenda do dia, agendamentos por status, pacientes por período — exporta Excel/PDF.
+- `audit/` — `AuditService.log()` gravado em toda ação crítica.
+- `common/` — `ResponseInterceptor` (envelope global), `AllExceptionsFilter`, `TraceIdMiddleware` (injeta `trace_id` uuid por request), decorators `@Public()`, `@Roles()`, `@CurrentUser()`, `@SkipResponseInterceptor()`.
+
+**Prisma** em `backend/prisma/schema.prisma`. `PrismaService` é singleton global via `PrismaModule` (exports `PrismaService`).
+
+**Envelope de resposta global** (todos endpoints exceto `@SkipResponseInterceptor()`):
+```json
+{ "success": true, "data": <payload>, "error": null }
+{ "success": false, "data": null, "error": { "code", "message", "details", "trace_id" } }
+```
+
+Rotas públicas: `POST /api/auth/login`, `POST /api/auth/refresh`, `GET /health`, `GET /ready`.
+
+### Frontend — React + Vite + PWA
+
+- **Roteamento**: `react-router-dom` v6, todas rotas protegidas por `PrivateRoute` (verifica token Zustand). `RoleRoute` restringe por perfil.
+- **Estado de auth**: `zustand` em `frontend/src/store/auth.ts`.
+- **HTTP**: `axios` com `baseURL: '/api'` em `frontend/src/api/client.ts`. Interceptor injeta Bearer token e redireciona para `/login` em 401.
+- **Server state**: `@tanstack/react-query` v5.
+- **Path alias**: `@` → `frontend/src/` (configurado em `vite.config.ts`).
+- Cada domain tem seu módulo de API em `frontend/src/api/<domain>.ts`.
+- PWA registra SW com `autoUpdate`; cache de API usa `NetworkFirst` com timeout 5s.
+
+### Camadas cross-cutting
+
+- `trace_id` (UUID v4) gerado por `TraceIdMiddleware` em cada request, propagado via `req.trace_id`, incluído em logs e erros.
+- Rate limit global: 100 req/min por IP (`ThrottlerProxyGuard` lida com proxy X-Forwarded-For).
+- Logs estruturados via `nestjs-pino`; `req.headers.authorization` e `req.body.senha` redacted automaticamente.
+- APP_GUARD ordem (importa para lógica de short-circuit): `ThrottlerProxyGuard` → `JwtAuthGuard` → `RolesGuard`.
+- Rotas sem JWT: decorar com `@Public()`. Rotas sem envelope de resposta: `@SkipResponseInterceptor()`.

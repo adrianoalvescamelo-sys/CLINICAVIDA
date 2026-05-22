@@ -461,6 +461,29 @@ describe('Relatorios (e2e)', () => {
           .set('Authorization', `Bearer ${medicoToken}`)
           .expect(403);
       });
+
+      it(`profissional não médico recebe 403 em ${route}`, async () => {
+        await request(app.getHttpServer())
+          .get(route)
+          .query({
+            data: periodoInicio,
+            inicio: periodoInicio,
+            fim: periodoFim,
+          })
+          .set('Authorization', `Bearer ${profNaoMedicoToken}`)
+          .expect(403);
+      });
+
+      it(`sem Authorization recebe 401 em ${route}`, async () => {
+        await request(app.getHttpServer())
+          .get(route)
+          .query({
+            data: periodoInicio,
+            inicio: periodoInicio,
+            fim: periodoFim,
+          })
+          .expect(401);
+      });
     }
 
     it('admin gera xlsx de agenda-dia', async () => {

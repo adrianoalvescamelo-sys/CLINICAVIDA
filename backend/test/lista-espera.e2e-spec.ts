@@ -157,18 +157,22 @@ describe('ListaEspera (e2e)', () => {
       .set('Authorization', `Bearer ${recepcaoToken}`)
       .expect(200);
 
-    const ids = res.body.data.map((item: { id: string }) => item.id);
+    const items = res.body.data.items;
+    expect(Array.isArray(items)).toBe(true);
+    expect(res.body.data).toHaveProperty('nextCursor');
+
+    const ids = items.map((item: { id: string }) => item.id);
     expect(ids.slice(0, 3)).toEqual([
       highestPriority.id,
       firstSamePriority.id,
       secondSamePriority.id,
     ]);
-    expect(res.body.data[0].paciente).toMatchObject({
+    expect(items[0].paciente).toMatchObject({
       id: pacienteId,
       nomeCompleto: 'Paciente Lista Espera E2E',
       telefoneWhatsapp: '65999990001',
     });
-    expect(res.body.data[0].profissional).toMatchObject({
+    expect(items[0].profissional).toMatchObject({
       id: profissionalId,
       nomeCompleto: 'Profissional Lista Espera E2E',
       especialidade: 'Cardiologia E2E',

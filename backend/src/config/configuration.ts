@@ -17,10 +17,6 @@ export default () => ({
     botSecret: process.env.BOT_SECRET ?? '',
     tvSecret: process.env.TV_SECRET ?? '',
   },
-  /** @deprecated use config.security.botSecret — kept for backward compat with bot-auth.guard */
-  botSecret: process.env.BOT_SECRET ?? '',
-  /** @deprecated use config.security.tvSecret — kept for backward compat with tv-auth.guard */
-  tvSecret: process.env.TV_SECRET ?? '',
   whatsapp: {
     n8nWebhookUrl: process.env.N8N_WEBHOOK_URL ?? '',
     n8nTimeoutMs: parseInt(process.env.N8N_TIMEOUT_MS ?? '10000', 10),
@@ -33,6 +29,13 @@ export default () => ({
     limiteAutoHoras: parseInt(process.env.WA_LIMITE_AUTO_HORAS ?? '2', 10),
     enabled: (process.env.WA_ENABLED ?? 'true').toLowerCase() === 'true',
     dryRun: (process.env.WA_DRY_RUN ?? 'false').toLowerCase() === 'true',
+    // Lista de números (só dígitos) que recebem envio real durante rollout gradual.
+    // Vazio = sem restrição (todos elegíveis recebem, sujeito a dryRun global).
+    // Preenchido = apenas estes recebem real; demais são forçados a dry-run.
+    allowlist: (process.env.WA_ALLOWLIST ?? '')
+      .split(',')
+      .map((n) => n.replace(/\D/g, ''))
+      .filter((n) => n.length > 0),
   },
 });
 
@@ -43,6 +46,7 @@ export function validateEnv(config: Record<string, unknown>) {
     'JWT_REFRESH_SECRET',
     'CORS_ORIGIN',
     'BOT_SECRET',
+    'TV_SECRET',
   ];
   const missing = required.filter((k) => !config[k]);
   if (missing.length > 0) {
@@ -58,6 +62,9 @@ export function validateEnv(config: Record<string, unknown>) {
     config.JWT_REFRESH_SECRET.length < 32
   ) {
     throw new Error('JWT_REFRESH_SECRET deve ter pelo menos 32 caracteres');
+  }
+  if (typeof config.TV_SECRET === 'string' && config.TV_SECRET.length < 16) {
+    throw new Error('TV_SECRET deve ter pelo menos 16 caracteres');
   }
   return config;
 }

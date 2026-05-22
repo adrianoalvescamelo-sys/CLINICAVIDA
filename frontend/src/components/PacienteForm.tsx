@@ -85,12 +85,22 @@ export default function PacienteForm({
           form.responsavelCpf?.replace(/\D/g, '') || undefined,
         observacoes: form.observacoes?.trim() || undefined,
       });
-    } catch (err: any) {
-      const apiErr = err?.response?.data?.error;
-      const msg =
-        Array.isArray(apiErr?.message)
-          ? apiErr.message.join(', ')
-          : apiErr?.message ?? err?.message ?? 'Erro ao salvar';
+    } catch (err) {
+      const e = err as {
+        response?: {
+          data?: {
+            error?: {
+              message?: string | string[];
+              details?: Record<string, unknown> | null;
+            };
+          };
+        };
+        message?: string;
+      };
+      const apiErr = e?.response?.data?.error;
+      const msg = Array.isArray(apiErr?.message)
+        ? apiErr.message.join(', ')
+        : (apiErr?.message ?? e?.message ?? 'Erro ao salvar');
       setErro(msg);
       setErroDetalhes(apiErr?.details ?? null);
     }

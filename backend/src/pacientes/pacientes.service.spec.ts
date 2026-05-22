@@ -155,13 +155,17 @@ describe('PacientesService', () => {
 
     it('CPF duplicado (paciente ativo) → lança ConflictException com code CPF_DUPLICADO', async () => {
       const dto = makeCreateDto();
-      const existente = { id: UUID_B, nomeCompleto: 'Outro Paciente', deletedAt: null };
+      const existente = {
+        id: UUID_B,
+        nomeCompleto: 'Outro Paciente',
+        deletedAt: null,
+      };
 
       prisma.paciente.findUnique.mockResolvedValue(existente);
 
-      await expect(service.create(dto as any, USER_ID, IP, TRACE)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.create(dto as any, USER_ID, IP, TRACE),
+      ).rejects.toThrow(ConflictException);
 
       // Confirma que o código correto está no payload
       try {
@@ -178,7 +182,11 @@ describe('PacientesService', () => {
     it('CPF de paciente soft-deleted → permite criar novo registro', async () => {
       const dto = makeCreateDto();
       // Simula existente com deletedAt preenchido
-      const deletado = { id: UUID_B, nomeCompleto: 'Antigo', deletedAt: new Date() };
+      const deletado = {
+        id: UUID_B,
+        nomeCompleto: 'Antigo',
+        deletedAt: new Date(),
+      };
       const criado = makePaciente();
 
       prisma.paciente.findUnique.mockResolvedValue(deletado);
@@ -302,7 +310,10 @@ describe('PacientesService', () => {
 
     it('sucesso: atualiza dados, grava histórico e auditoria', async () => {
       const atual = makePaciente({ updatedAt });
-      const atualizado = makePaciente({ nomeCompleto: 'Novo Nome', updatedAt: new Date() });
+      const atualizado = makePaciente({
+        nomeCompleto: 'Novo Nome',
+        updatedAt: new Date(),
+      });
       const dto = {
         nomeCompleto: 'Novo Nome',
         updatedAt: updatedAt.toISOString(),
@@ -312,7 +323,13 @@ describe('PacientesService', () => {
       prisma.paciente.update.mockResolvedValue(atualizado);
       prisma.pacienteHistorico.create.mockResolvedValue({});
 
-      const result = await service.update(UUID_A, dto as any, USER_ID, IP, TRACE);
+      const result = await service.update(
+        UUID_A,
+        dto as any,
+        USER_ID,
+        IP,
+        TRACE,
+      );
 
       expect(result).toEqual(atualizado);
       expect(prisma.paciente.update).toHaveBeenCalledWith(
@@ -320,12 +337,17 @@ describe('PacientesService', () => {
       );
       expect(prisma.pacienteHistorico.create).toHaveBeenCalledTimes(1);
       expect(audit.log).toHaveBeenCalledWith(
-        expect.objectContaining({ acao: 'UPDATE', resultado: AuditResultado.SUCESSO }),
+        expect.objectContaining({
+          acao: 'UPDATE',
+          resultado: AuditResultado.SUCESSO,
+        }),
       );
     });
 
     it('CONCURRENT_UPDATE: updatedAt divergente → lança ConflictException', async () => {
-      const atual = makePaciente({ updatedAt: new Date('2026-01-01T12:00:00Z') });
+      const atual = makePaciente({
+        updatedAt: new Date('2026-01-01T12:00:00Z'),
+      });
       const dto = {
         nomeCompleto: 'Qualquer',
         updatedAt: new Date('2026-01-01T10:00:00Z').toISOString(), // diferente
@@ -377,7 +399,13 @@ describe('PacientesService', () => {
       prisma.paciente.update.mockResolvedValue(atualizado);
       prisma.pacienteHistorico.create.mockResolvedValue({});
 
-      const result = await service.update(UUID_A, dto as any, USER_ID, IP, TRACE);
+      const result = await service.update(
+        UUID_A,
+        dto as any,
+        USER_ID,
+        IP,
+        TRACE,
+      );
       expect(result).toEqual(atualizado);
     });
   });
@@ -399,7 +427,10 @@ describe('PacientesService', () => {
         data: expect.objectContaining({ deletedAt: expect.any(Date) }),
       });
       expect(audit.log).toHaveBeenCalledWith(
-        expect.objectContaining({ acao: 'DELETE', resultado: AuditResultado.SUCESSO }),
+        expect.objectContaining({
+          acao: 'DELETE',
+          resultado: AuditResultado.SUCESSO,
+        }),
       );
     });
 
@@ -423,8 +454,22 @@ describe('PacientesService', () => {
     it('sucesso: retorna lista de histórico ordenada por data desc', async () => {
       const p = makePaciente();
       const registros = [
-        { id: 'h1', pacienteId: UUID_A, acao: 'CREATE', diff: {}, traceId: TRACE, createdAt: new Date() },
-        { id: 'h2', pacienteId: UUID_A, acao: 'UPDATE', diff: {}, traceId: TRACE, createdAt: new Date() },
+        {
+          id: 'h1',
+          pacienteId: UUID_A,
+          acao: 'CREATE',
+          diff: {},
+          traceId: TRACE,
+          createdAt: new Date(),
+        },
+        {
+          id: 'h2',
+          pacienteId: UUID_A,
+          acao: 'UPDATE',
+          diff: {},
+          traceId: TRACE,
+          createdAt: new Date(),
+        },
       ];
 
       prisma.paciente.findFirst.mockResolvedValue(p);
@@ -443,7 +488,9 @@ describe('PacientesService', () => {
     it('paciente não encontrado → lança NotFoundException', async () => {
       prisma.paciente.findFirst.mockResolvedValue(null);
 
-      await expect(service.historico(UUID_A)).rejects.toThrow(NotFoundException);
+      await expect(service.historico(UUID_A)).rejects.toThrow(
+        NotFoundException,
+      );
       expect(prisma.pacienteHistorico.findMany).not.toHaveBeenCalled();
     });
   });

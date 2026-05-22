@@ -1,0 +1,74 @@
+{
+  "id": "clinicavidaOutb01",
+  "name": "clinicavida-outbound",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clinicavida-outbound",
+        "responseMode": "onReceived",
+        "responseCode": 200,
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "Webhook (do backend)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "clinicavida-outbound"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution-api-vyes-api-1:8080/message/sendText/appclinica",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "e9OrBMZNDCB2d4E1K8CZyCTss6yoxye7" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.body.to }}\",\n  \"text\": {{ JSON.stringify($json.body.texto) }}\n}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "evo-send",
+      "name": "Evolution sendText",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://clinicavida-api-homolog:3000/api/bot/whatsapp/status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-bot-secret", "value": "8b8b759deeed9b75383f5d2e6a03b368238350ac04d5a0a9" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"eventId\": \"{{ $node[\"Webhook (do backend)\"].json.body.eventId }}\",\n  \"status\": \"{{ $json.key && $json.key.id ? \"ENTREGUE\" : \"FALHA\" }}\",\n  \"providerMsgId\": \"{{ $json.key ? $json.key.id : \"\" }}\",\n  \"erro\": {{ $json.key && $json.key.id ? \"null\" : JSON.stringify($json.message || \"falha no envio Evolution\") }}\n}",
+        "options": {}
+      },
+      "id": "cb-status",
+      "name": "Callback status -> backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [800, 300]
+    }
+  ],
+  "connections": {
+    "Webhook (do backend)": {
+      "main": [[{ "node": "Evolution sendText", "type": "main", "index": 0 }]]
+    },
+    "Evolution sendText": {
+      "main": [[{ "node": "Callback status -> backend", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

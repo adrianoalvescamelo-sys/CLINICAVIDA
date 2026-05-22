@@ -15,10 +15,7 @@
  * Isolamento: PrismaService e AuditService completamente mockados.
  */
 
-import {
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ListaEsperaService } from './lista-espera.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -28,12 +25,12 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 // ─── constantes ─────────────────────────────────────────────────────────────
 
-const UUID_PAC  = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const UUID_PAC = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const UUID_PROF = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-const UUID_LE   = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const UUID_LE = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const UUID_USER = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
-const IP        = '127.0.0.1';
-const TRACE     = 'test-trace-id';
+const IP = '127.0.0.1';
+const TRACE = 'test-trace-id';
 
 const CTX = { usuarioId: UUID_USER, ip: IP, traceId: TRACE };
 
@@ -55,8 +52,16 @@ function makeListaEsperaDb(overrides: Record<string, unknown> = {}) {
     criadoPor: UUID_USER,
     createdAt: new Date('2026-06-01T08:00:00Z'),
     updatedAt: new Date('2026-06-01T08:00:00Z'),
-    paciente: { id: UUID_PAC, nomeCompleto: 'Paciente Teste', telefoneWhatsapp: '65999991111' },
-    profissional: { id: UUID_PROF, nomeCompleto: 'Dr. Teste', especialidade: 'Cardiologia' },
+    paciente: {
+      id: UUID_PAC,
+      nomeCompleto: 'Paciente Teste',
+      telefoneWhatsapp: '65999991111',
+    },
+    profissional: {
+      id: UUID_PROF,
+      nomeCompleto: 'Dr. Teste',
+      especialidade: 'Cardiologia',
+    },
     ...overrides,
   };
 }
@@ -131,7 +136,10 @@ describe('ListaEsperaService', () => {
       const criado = makeListaEsperaDb();
 
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
       prisma.listaEspera.findFirst.mockResolvedValue(null); // sem duplicidade
       prisma.listaEspera.create.mockResolvedValue(criado);
 
@@ -152,9 +160,9 @@ describe('ListaEsperaService', () => {
     it('PACIENTE_NAO_ENCONTRADO: lança NotFoundException quando paciente não existe', async () => {
       prisma.paciente.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.create(makeCreateDto() as any, CTX),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create(makeCreateDto() as any, CTX)).rejects.toThrow(
+        NotFoundException,
+      );
 
       try {
         await service.create(makeCreateDto() as any, CTX);
@@ -169,9 +177,9 @@ describe('ListaEsperaService', () => {
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
       prisma.profissional.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.create(makeCreateDto() as any, CTX),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create(makeCreateDto() as any, CTX)).rejects.toThrow(
+        NotFoundException,
+      );
 
       try {
         await service.create(makeCreateDto() as any, CTX);
@@ -180,20 +188,28 @@ describe('ListaEsperaService', () => {
       }
 
       // Profissional existe mas está inativo
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: false });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: false,
+      });
 
-      await expect(
-        service.create(makeCreateDto() as any, CTX),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create(makeCreateDto() as any, CTX)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('LISTA_ESPERA_DUPLICADA: lança ConflictException quando já existe item ativo', async () => {
       const dto = makeCreateDto();
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
       prisma.listaEspera.findFirst.mockResolvedValue({ id: 'existing-id' });
 
-      await expect(service.create(dto as any, CTX)).rejects.toThrow(ConflictException);
+      await expect(service.create(dto as any, CTX)).rejects.toThrow(
+        ConflictException,
+      );
 
       try {
         await service.create(dto as any, CTX);
@@ -208,16 +224,25 @@ describe('ListaEsperaService', () => {
     it('LISTA_ESPERA_DUPLICADA via P2002: mapDuplicidade captura erro Prisma', async () => {
       const dto = makeCreateDto();
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
       prisma.listaEspera.findFirst.mockResolvedValue(null); // sem duplicidade em checkagem manual
 
       const prismaError = new PrismaClientKnownRequestError(
         'Unique constraint failed',
-        { code: 'P2002', clientVersion: '5.0.0', meta: { target: ['lista_espera_ativa_unica'] } },
+        {
+          code: 'P2002',
+          clientVersion: '5.0.0',
+          meta: { target: ['lista_espera_ativa_unica'] },
+        },
       );
       prisma.listaEspera.create.mockRejectedValue(prismaError);
 
-      await expect(service.create(dto as any, CTX)).rejects.toThrow(ConflictException);
+      await expect(service.create(dto as any, CTX)).rejects.toThrow(
+        ConflictException,
+      );
 
       try {
         await service.create(dto as any, CTX);
@@ -247,18 +272,62 @@ describe('ListaEsperaService', () => {
   // ═════════════════════════════════════════════════════════════════════════
 
   describe('findAll', () => {
-    it('sem filtro: usa status ATIVO como default e retorna lista', async () => {
+    it('sem filtro: usa status ATIVO como default e retorna página', async () => {
       const items = [makeListaEsperaDb()];
       prisma.listaEspera.findMany.mockResolvedValue(items);
 
       const result = await service.findAll({} as any);
 
-      expect(result).toEqual(items);
+      expect(result).toEqual({ items, nextCursor: null });
       expect(prisma.listaEspera.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ status: ListaEsperaStatus.ATIVO }),
-          orderBy: [{ prioridade: 'desc' }, { createdAt: 'asc' }],
-          take: 500,
+          orderBy: [
+            { prioridade: 'desc' },
+            { createdAt: 'asc' },
+            { id: 'asc' },
+          ],
+          take: 51,
+        }),
+      );
+    });
+
+    it('paginação: retorna nextCursor quando page cheia', async () => {
+      // limit default 50; mock retorna 51 itens (limit+1) para simular página cheia
+      const rows = Array.from({ length: 51 }, (_, i) =>
+        makeListaEsperaDb({
+          id: `cccccccc-cccc-4ccc-8ccc-${String(i).padStart(12, '0')}`,
+        }),
+      );
+      prisma.listaEspera.findMany.mockResolvedValue(rows);
+
+      const result = await service.findAll({} as any);
+
+      expect(result.items).toHaveLength(50);
+      expect(result.nextCursor).toBe(rows[49].id);
+    });
+
+    it('paginação: respeita limit customizado e clamp ao MAX', async () => {
+      prisma.listaEspera.findMany.mockResolvedValue([]);
+
+      await service.findAll({ limit: 10 } as any);
+
+      expect(prisma.listaEspera.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 11 }),
+      );
+    });
+
+    it('paginação: cursor passado aciona skip 1', async () => {
+      prisma.listaEspera.findMany.mockResolvedValue([]);
+      const cursor = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+
+      await service.findAll({ cursor, limit: 20 } as any);
+
+      expect(prisma.listaEspera.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cursor: { id: cursor },
+          skip: 1,
+          take: 21,
         }),
       );
     });
@@ -270,7 +339,9 @@ describe('ListaEsperaService', () => {
 
       expect(prisma.listaEspera.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ status: ListaEsperaStatus.CONTATADO }),
+          where: expect.objectContaining({
+            status: ListaEsperaStatus.CONTATADO,
+          }),
         }),
       );
     });
@@ -313,12 +384,13 @@ describe('ListaEsperaService', () => {
       );
     });
 
-    it('empty state: retorna array vazio quando não há dados', async () => {
+    it('empty state: retorna página vazia quando não há dados', async () => {
       prisma.listaEspera.findMany.mockResolvedValue([]);
 
       const result = await service.findAll({} as any);
 
-      expect(result).toHaveLength(0);
+      expect(result.items).toHaveLength(0);
+      expect(result.nextCursor).toBeNull();
     });
   });
 
@@ -335,7 +407,11 @@ describe('ListaEsperaService', () => {
       prisma.listaEspera.findFirst.mockResolvedValue(null); // sem duplicidade
       prisma.listaEspera.update.mockResolvedValue(atualizado);
 
-      const result = await service.update(UUID_LE, { prioridade: 99 } as any, CTX);
+      const result = await service.update(
+        UUID_LE,
+        { prioridade: 99 } as any,
+        CTX,
+      );
 
       expect(result).toEqual(atualizado);
       expect(prisma.listaEspera.update).toHaveBeenCalledWith(
@@ -376,20 +452,34 @@ describe('ListaEsperaService', () => {
       prisma.listaEspera.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.update('00000000-0000-4000-8000-000000000000', { prioridade: 5 } as any, CTX),
+        service.update(
+          '00000000-0000-4000-8000-000000000000',
+          { prioridade: 5 } as any,
+          CTX,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('TRANSICAO_INVALIDA: não permite update de status final', async () => {
-      const recusado = makeListaEsperaDb({ status: ListaEsperaStatus.RECUSADO });
+      const recusado = makeListaEsperaDb({
+        status: ListaEsperaStatus.RECUSADO,
+      });
       prisma.listaEspera.findUnique.mockResolvedValue(recusado);
 
       await expect(
-        service.update(UUID_LE, { status: ListaEsperaStatus.CONTATADO } as any, CTX),
+        service.update(
+          UUID_LE,
+          { status: ListaEsperaStatus.CONTATADO } as any,
+          CTX,
+        ),
       ).rejects.toThrow(ConflictException);
 
       try {
-        await service.update(UUID_LE, { status: ListaEsperaStatus.CONTATADO } as any, CTX);
+        await service.update(
+          UUID_LE,
+          { status: ListaEsperaStatus.CONTATADO } as any,
+          CTX,
+        );
       } catch (e: any) {
         expect(e.response.code).toBe('TRANSICAO_LISTA_ESPERA_INVALIDA');
       }
@@ -430,10 +520,14 @@ describe('ListaEsperaService', () => {
     });
 
     it('TRANSICAO_INVALIDA: não pode ofertar vaga a partir de RECUSADO', async () => {
-      const recusado = makeListaEsperaDb({ status: ListaEsperaStatus.RECUSADO });
+      const recusado = makeListaEsperaDb({
+        status: ListaEsperaStatus.RECUSADO,
+      });
       prisma.listaEspera.findUnique.mockResolvedValue(recusado);
 
-      await expect(service.ofertarVaga(UUID_LE, CTX)).rejects.toThrow(ConflictException);
+      await expect(service.ofertarVaga(UUID_LE, CTX)).rejects.toThrow(
+        ConflictException,
+      );
 
       try {
         await service.ofertarVaga(UUID_LE, CTX);
@@ -445,16 +539,22 @@ describe('ListaEsperaService', () => {
     });
 
     it('TRANSICAO_INVALIDA: não pode ofertar vaga a partir de AGENDADO', async () => {
-      const agendado = makeListaEsperaDb({ status: ListaEsperaStatus.AGENDADO });
+      const agendado = makeListaEsperaDb({
+        status: ListaEsperaStatus.AGENDADO,
+      });
       prisma.listaEspera.findUnique.mockResolvedValue(agendado);
 
-      await expect(service.ofertarVaga(UUID_LE, CTX)).rejects.toThrow(ConflictException);
+      await expect(service.ofertarVaga(UUID_LE, CTX)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('item não encontrado: lança NotFoundException', async () => {
       prisma.listaEspera.findUnique.mockResolvedValue(null);
 
-      await expect(service.ofertarVaga(UUID_LE, CTX)).rejects.toThrow(NotFoundException);
+      await expect(service.ofertarVaga(UUID_LE, CTX)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -464,7 +564,9 @@ describe('ListaEsperaService', () => {
 
   describe('registrarRecusa', () => {
     it('sucesso: CONTATADO → RECUSADO com motivoRecusa e ultimaRespostaEm', async () => {
-      const contatado = makeListaEsperaDb({ status: ListaEsperaStatus.CONTATADO });
+      const contatado = makeListaEsperaDb({
+        status: ListaEsperaStatus.CONTATADO,
+      });
       const recusado = makeListaEsperaDb({
         status: ListaEsperaStatus.RECUSADO,
         motivoRecusa: 'Paciente indisponível',
@@ -489,18 +591,22 @@ describe('ListaEsperaService', () => {
     });
 
     it('TRANSICAO_INVALIDA: não pode recusar a partir de AGENDADO', async () => {
-      const agendado = makeListaEsperaDb({ status: ListaEsperaStatus.AGENDADO });
+      const agendado = makeListaEsperaDb({
+        status: ListaEsperaStatus.AGENDADO,
+      });
       prisma.listaEspera.findUnique.mockResolvedValue(agendado);
 
-      await expect(
-        service.registrarRecusa(UUID_LE, {}, CTX),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.registrarRecusa(UUID_LE, {}, CTX)).rejects.toThrow(
+        ConflictException,
+      );
 
       expect(prisma.listaEspera.update).not.toHaveBeenCalled();
     });
 
     it('sem motivoRecusa: aceita recusa sem motivo', async () => {
-      const contatado = makeListaEsperaDb({ status: ListaEsperaStatus.CONTATADO });
+      const contatado = makeListaEsperaDb({
+        status: ListaEsperaStatus.CONTATADO,
+      });
       const recusado = makeListaEsperaDb({
         status: ListaEsperaStatus.RECUSADO,
         motivoRecusa: null,
@@ -540,10 +646,14 @@ describe('ListaEsperaService', () => {
     });
 
     it('TRANSICAO_INVALIDA: não pode agendar a partir de RECUSADO', async () => {
-      const recusado = makeListaEsperaDb({ status: ListaEsperaStatus.RECUSADO });
+      const recusado = makeListaEsperaDb({
+        status: ListaEsperaStatus.RECUSADO,
+      });
       prisma.listaEspera.findUnique.mockResolvedValue(recusado);
 
-      await expect(service.marcarAgendado(UUID_LE, CTX)).rejects.toThrow(ConflictException);
+      await expect(service.marcarAgendado(UUID_LE, CTX)).rejects.toThrow(
+        ConflictException,
+      );
 
       try {
         await service.marcarAgendado(UUID_LE, CTX);
@@ -555,7 +665,9 @@ describe('ListaEsperaService', () => {
     it('item não encontrado: lança NotFoundException', async () => {
       prisma.listaEspera.findUnique.mockResolvedValue(null);
 
-      await expect(service.marcarAgendado(UUID_LE, CTX)).rejects.toThrow(NotFoundException);
+      await expect(service.marcarAgendado(UUID_LE, CTX)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -566,7 +678,9 @@ describe('ListaEsperaService', () => {
   describe('validarTransicao (via operações)', () => {
     it('ATIVO → CONTATADO: permitido via ofertarVaga', async () => {
       const ativo = makeListaEsperaDb({ status: ListaEsperaStatus.ATIVO });
-      const contatado = makeListaEsperaDb({ status: ListaEsperaStatus.CONTATADO });
+      const contatado = makeListaEsperaDb({
+        status: ListaEsperaStatus.CONTATADO,
+      });
 
       prisma.listaEspera.findUnique.mockResolvedValue(ativo);
       prisma.listaEspera.update.mockResolvedValue(contatado);
@@ -575,20 +689,30 @@ describe('ListaEsperaService', () => {
     });
 
     it('CANCELADO → qualquer: bloqueado como status final', async () => {
-      const cancelado = makeListaEsperaDb({ status: ListaEsperaStatus.CANCELADO });
+      const cancelado = makeListaEsperaDb({
+        status: ListaEsperaStatus.CANCELADO,
+      });
       prisma.listaEspera.findUnique.mockResolvedValue(cancelado);
 
-      await expect(service.ofertarVaga(UUID_LE, CTX)).rejects.toThrow(ConflictException);
+      await expect(service.ofertarVaga(UUID_LE, CTX)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('CONTATADO → RECUSADO: permitido via registrarRecusa', async () => {
-      const contatado = makeListaEsperaDb({ status: ListaEsperaStatus.CONTATADO });
-      const recusado = makeListaEsperaDb({ status: ListaEsperaStatus.RECUSADO });
+      const contatado = makeListaEsperaDb({
+        status: ListaEsperaStatus.CONTATADO,
+      });
+      const recusado = makeListaEsperaDb({
+        status: ListaEsperaStatus.RECUSADO,
+      });
 
       prisma.listaEspera.findUnique.mockResolvedValue(contatado);
       prisma.listaEspera.update.mockResolvedValue(recusado);
 
-      await expect(service.registrarRecusa(UUID_LE, {}, CTX)).resolves.not.toThrow();
+      await expect(
+        service.registrarRecusa(UUID_LE, {}, CTX),
+      ).resolves.not.toThrow();
     });
   });
 });

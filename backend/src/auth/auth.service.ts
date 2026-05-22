@@ -12,6 +12,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { AuditResultado } from '@prisma/client';
 
+function parseDurationMs(duration: string): number {
+  const num = parseInt(duration, 10);
+  if (duration.endsWith('d')) return num * 24 * 60 * 60 * 1000;
+  if (duration.endsWith('h')) return num * 60 * 60 * 1000;
+  if (duration.endsWith('m')) return num * 60 * 1000;
+  if (duration.endsWith('s')) return num * 1000;
+  return num;
+}
+
 export interface TokenPair {
   access_token: string;
   refresh_token: string;
@@ -66,8 +75,7 @@ export class AuthService {
 
     // persist SHA-256 hash — never plaintext
     const tokenHash = this.hashToken(refresh_token);
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-    const expiresAt = new Date(Date.now() + SEVEN_DAYS_MS);
+    const expiresAt = new Date(Date.now() + parseDurationMs(refreshExpiresIn));
 
     await this.prisma.refreshToken.create({
       data: {
@@ -110,7 +118,7 @@ export class AuthService {
         detalhes: { email, motivo: 'usuario_nao_encontrado' },
       });
       throw new UnauthorizedException({
-        code: 'UNAUTHORIZED',
+        code: 'CREDENCIAIS_INVALIDAS',
         message: 'Credenciais inválidas',
       });
     }
@@ -168,7 +176,7 @@ export class AuthService {
       });
 
       throw new UnauthorizedException({
-        code: 'UNAUTHORIZED',
+        code: 'CREDENCIAIS_INVALIDAS',
         message: 'Credenciais inválidas',
       });
     }
@@ -304,8 +312,9 @@ export class AuthService {
       );
 
       const newHash = this.hashToken(refresh_token);
-      const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-      const newExpiresAt = new Date(Date.now() + SEVEN_DAYS_MS);
+      const newExpiresAt = new Date(
+        Date.now() + parseDurationMs(refreshExpiresIn),
+      );
 
       const newRecord = await tx.refreshToken.create({
         data: {
@@ -337,6 +346,72 @@ export class AuthService {
     });
 
     return newPair;
+  }
+
+  async trocarSenhaPropria(
+    usuarioId: string,
+    senhaAtual: string,
+    novaSenha: string,
+    ip: string,
+    traceId: string,
+  ): Promise<void> {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+    });
+    if (!usuario) {
+      throw new UnauthorizedException({
+        code: 'USUARIO_NAO_ENCONTRADO',
+        message: 'Usuário não encontrado',
+      });
+    }
+
+    const ok = await argon2.verify(usuario.senhaHash, senhaAtual);
+    if (!ok) {
+      await this.audit.log({
+        usuarioId,
+        acao: 'SENHA_TROCA_PROPRIA',
+        entidade: 'Usuario',
+        registroId: usuarioId,
+        ipDispositivo: ip,
+        resultado: AuditResultado.FALHA,
+        traceId,
+        detalhes: { motivo: 'senha_atual_incorreta' },
+      });
+      throw new UnauthorizedException({
+        code: 'SENHA_ATUAL_INVALIDA',
+        message: 'Senha atual incorreta',
+      });
+    }
+
+    if (senhaAtual === novaSenha) {
+      throw new UnauthorizedException({
+        code: 'SENHA_IGUAL_ATUAL',
+        message: 'Nova senha não pode ser igual à atual',
+      });
+    }
+
+    const senhaHash = await argon2.hash(novaSenha, { type: argon2.argon2id });
+
+    await this.prisma.$transaction([
+      this.prisma.usuario.update({
+        where: { id: usuarioId },
+        data: { senhaHash, tentativasLogin: 0, bloqueadoAte: null },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { usuarioId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.audit.log({
+      usuarioId,
+      acao: 'SENHA_TROCA_PROPRIA',
+      entidade: 'Usuario',
+      registroId: usuarioId,
+      ipDispositivo: ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId,
+    });
   }
 
   async logout(

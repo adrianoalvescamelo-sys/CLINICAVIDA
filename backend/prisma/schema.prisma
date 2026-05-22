@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -8,20 +9,40 @@ datasource db {
 }
 
 model Usuario {
-  id              String      @id @default(uuid()) @db.Uuid
-  email           String      @unique
-  senhaHash       String      @map("senha_hash")
-  nomeCompleto    String      @map("nome_completo")
+  id              String         @id @default(uuid()) @db.Uuid
+  email           String         @unique
+  senhaHash       String         @map("senha_hash")
+  nomeCompleto    String         @map("nome_completo")
   perfil          PerfilTipo
-  ativo           Boolean     @default(true)
-  tentativasLogin Int         @default(0) @map("tentativas_login")
-  bloqueadoAte    DateTime?   @map("bloqueado_ate")
-  ultimoLoginEm   DateTime?   @map("ultimo_login_em")
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  ativo           Boolean        @default(true)
+  tentativasLogin Int            @default(0) @map("tentativas_login")
+  bloqueadoAte    DateTime?      @map("bloqueado_ate")
+  ultimoLoginEm   DateTime?      @map("ultimo_login_em")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
   auditorias      Auditoria[]
+  refreshTokens   RefreshToken[]
+  evolucoes       Evolucao[]
+  documentos      DocumentoMedico[]
 
   @@map("usuarios")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  usuarioId  String    @map("usuario_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  replacedBy String?   @map("replaced_by") @db.Uuid
+  ip         String?
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
 
 model Paciente {
@@ -46,6 +67,8 @@ model Paciente {
   listaEspera        ListaEspera[]
   mensagens          MensagemWhatsapp[]
   historico          PacienteHistorico[]
+  prontuario         Prontuario?
+  documentos         DocumentoMedico[]
 
   @@index([nomeCompleto])
   @@index([telefoneWhatsapp])
@@ -118,6 +141,8 @@ model Agendamento {
   profissional       Profissional           @relation(fields: [profissionalId], references: [id])
   historico          AgendamentoHistorico[]
   mensagens          MensagemWhatsapp[]
+  evolucoes          Evolucao[]
+  documentos         DocumentoMedico[]
 
   @@index([profissionalId, dataHoraInicio])
   @@index([pacienteId, dataHoraInicio])
@@ -220,6 +245,22 @@ model Auditoria {
   @@map("auditoria")
 }
 
+model ConfiguracaoClinica {
+  id                  String   @id @default(uuid()) @db.Uuid
+  nomeClinica         String   @default("Clínica Vida Popular") @map("nome_clinica")
+  horaAbertura        String   @default("07:00") @map("hora_abertura") @db.VarChar(5)
+  horaFechamento      String   @default("19:00") @map("hora_fechamento") @db.VarChar(5)
+  diasFuncionamento   Int[]    @default([1, 2, 3, 4, 5, 6]) @map("dias_funcionamento")
+  duracaoConsultaMin  Int      @default(30) @map("duracao_consulta_min")
+  intervaloAlmocoIni  String?  @map("intervalo_almoco_ini") @db.VarChar(5)
+  intervaloAlmocoFim  String?  @map("intervalo_almoco_fim") @db.VarChar(5)
+  timezone            String   @default("America/Cuiaba")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  atualizadoPor       String?  @map("atualizado_por") @db.Uuid
+
+  @@map("configuracoes_clinica")
+}
+
 enum PerfilTipo {
   ADMIN
   RECEPCAO
@@ -297,4 +338,68 @@ enum ListaEsperaStatus {
   RECUSADO
   AGENDADO
   CANCELADO
+}
+
+model Prontuario {
+  id         String     @id @default(uuid()) @db.Uuid
+  pacienteId String     @unique @map("paciente_id") @db.Uuid
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  paciente   Paciente   @relation(fields: [pacienteId], references: [id])
+  evolucoes  Evolucao[]
+
+  @@map("prontuarios")
+}
+
+model Evolucao {
+  id              String      @id @default(uuid()) @db.Uuid
+  prontuarioId    String      @map("prontuario_id") @db.Uuid
+  agendamentoId   String      @map("agendamento_id") @db.Uuid
+  autorUsuarioId  String      @map("autor_usuario_id") @db.Uuid
+  autorEhMedico   Boolean     @map("autor_eh_medico")
+  queixaPrincipal String?     @map("queixa_principal")
+  subjetivo       String
+  objetivo        String
+  avaliacao       String
+  plano           String
+  versao          Int         @default(1)
+  replacesId      String?     @unique @map("replaces_id") @db.Uuid
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  prontuario  Prontuario  @relation(fields: [prontuarioId], references: [id])
+  agendamento Agendamento @relation(fields: [agendamentoId], references: [id])
+  autor       Usuario     @relation(fields: [autorUsuarioId], references: [id])
+  replaces    Evolucao?   @relation("Retificacao", fields: [replacesId], references: [id])
+  replacedBy  Evolucao?   @relation("Retificacao")
+
+  @@index([prontuarioId, createdAt])
+  @@index([autorUsuarioId])
+  @@map("evolucoes")
+}
+
+enum TipoDocumento {
+  RECEITA
+  ATESTADO
+  PEDIDO_EXAME
+  ORIENTACOES
+}
+
+model DocumentoMedico {
+  id             String        @id @default(uuid()) @db.Uuid
+  pacienteId     String        @map("paciente_id") @db.Uuid
+  autorUsuarioId String        @map("autor_usuario_id") @db.Uuid
+  autorEhMedico  Boolean       @map("autor_eh_medico")
+  agendamentoId  String?       @map("agendamento_id") @db.Uuid
+  tipo           TipoDocumento
+  conteudo       Json
+  pdf            Bytes
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  paciente    Paciente     @relation(fields: [pacienteId], references: [id])
+  autor       Usuario      @relation(fields: [autorUsuarioId], references: [id])
+  agendamento Agendamento? @relation(fields: [agendamentoId], references: [id])
+
+  @@index([pacienteId, createdAt])
+  @@index([autorUsuarioId])
+  @@map("documentos_medicos")
 }

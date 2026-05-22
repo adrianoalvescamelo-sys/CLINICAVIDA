@@ -1,7 +1,15 @@
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { useAuthStore } from '../store/auth';
 
 export default function HomePage() {
+  const perfil = useAuthStore((s) => s.user?.perfil);
+  const isAdmin = perfil === 'ADMIN';
+  const isRecepcao = perfil === 'ADMIN' || perfil === 'RECEPCAO';
+  const podeBloquear =
+    perfil === 'ADMIN' ||
+    perfil === 'MEDICO' ||
+    perfil === 'PROFISSIONAL_NAO_MEDICO';
   return (
     <Layout>
       <h1 style={{ color: '#0f172a', marginTop: 0 }}>Painel</h1>
@@ -21,11 +29,25 @@ export default function HomePage() {
           enabled
         />
         <ModuleCard
+          to="/profissionais"
+          title="Profissionais"
+          subtitle="Médicos e equipe"
+          enabled
+        />
+        <ModuleCard
           to="/agenda"
           title="Agenda"
           subtitle="Agendamentos do dia"
           enabled
         />
+        {podeBloquear && (
+          <ModuleCard
+            to="/bloqueios"
+            title="Bloqueios"
+            subtitle="Indisponibilidade"
+            enabled
+          />
+        )}
         <ModuleCard
           to="/whatsapp"
           title="WhatsApp"
@@ -38,6 +60,14 @@ export default function HomePage() {
           subtitle="Operacao do dia"
           enabled
         />
+        {isRecepcao && (
+          <ModuleCard
+            to="/lista-espera"
+            title="Lista de espera"
+            subtitle="Fila priorizada"
+            enabled
+          />
+        )}
         <ModuleCard
           to="/painel-tv"
           title="Painel TV"
@@ -45,6 +75,22 @@ export default function HomePage() {
           enabled
         />
         <ModuleCard to="/relatorios" title="Relatórios" subtitle="Operacionais" enabled />
+        {isAdmin && (
+          <ModuleCard
+            to="/usuarios"
+            title="Usuários"
+            subtitle="Gerenciar logins"
+            enabled
+          />
+        )}
+        {isAdmin && (
+          <ModuleCard
+            to="/configuracoes"
+            title="Configurações"
+            subtitle="Horários e parâmetros"
+            enabled
+          />
+        )}
       </div>
     </Layout>
   );

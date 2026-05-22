@@ -56,8 +56,15 @@ export class AgendaController {
   }
 
   @Get()
-  findAll(@Query() q: QueryAgendamentosDto) {
-    return this.agenda.findAll(q);
+  async findAll(
+    @Query() q: QueryAgendamentosDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    const profissionalId = await this.profissionalDoUser(user.id);
+    return this.agenda.findAll(q, {
+      perfil: user.perfil as PerfilTipo,
+      profissionalId,
+    });
   }
 
   @Get('bloqueios')
@@ -66,8 +73,13 @@ export class AgendaController {
   }
 
   @Get(':id')
-  findOne(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.agenda.findOne(id);
+  async findOne(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: AuthUser,
+    @Req() req: Request,
+  ) {
+    const profId = await this.profissionalDoUser(user.id);
+    return this.agenda.findOneForCaller(id, this.ctx(req, user), profId);
   }
 
   @Patch(':id')
@@ -88,12 +100,13 @@ export class AgendaController {
     PerfilTipo.PROFISSIONAL_NAO_MEDICO,
     PerfilTipo.ADMIN,
   )
-  chamar(
+  async chamar(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ) {
-    return this.agenda.chamar(id, this.ctx(req, user));
+    const profId = await this.profissionalDoUser(user.id);
+    return this.agenda.chamar(id, this.ctx(req, user), profId);
   }
 
   @Post(':id/atendido')
@@ -103,12 +116,13 @@ export class AgendaController {
     PerfilTipo.PROFISSIONAL_NAO_MEDICO,
     PerfilTipo.ADMIN,
   )
-  atendido(
+  async atendido(
     @Param('id', new ParseUUIDPipe()) id: string,
     @CurrentUser() user: AuthUser,
     @Req() req: Request,
   ) {
-    return this.agenda.marcarAtendido(id, this.ctx(req, user));
+    const profId = await this.profissionalDoUser(user.id);
+    return this.agenda.marcarAtendido(id, this.ctx(req, user), profId);
   }
 
   @Post(':id/falta')
@@ -161,7 +175,7 @@ export class AgendaController {
       usuarioId: user.id,
       perfil: user.perfil as PerfilTipo,
       ip: this.ip(req),
-      traceId: (req as any).trace_id ?? 'unknown',
+      traceId: req.trace_id ?? 'unknown',
     };
   }
 

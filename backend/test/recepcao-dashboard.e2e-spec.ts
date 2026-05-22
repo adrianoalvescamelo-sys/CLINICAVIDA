@@ -31,11 +31,13 @@ describe('RecepcaoDashboard (e2e)', () => {
     admin: `admin.${suffix}@clinicavida.local`,
     recepcao: `recepcao.${suffix}@clinicavida.local`,
     medico: `medico.${suffix}@clinicavida.local`,
+    profNaoMedico: `profnm.${suffix}@clinicavida.local`,
   };
 
   let adminToken: string;
   let recepcaoToken: string;
   let medicoToken: string;
+  let profNaoMedicoToken: string;
   let pacienteId: string;
   let profissionalId: string;
 
@@ -83,6 +85,12 @@ describe('RecepcaoDashboard (e2e)', () => {
           nomeCompleto: 'Medico Recepcao Dashboard E2E',
           perfil: PerfilTipo.MEDICO,
         },
+        {
+          email: emails.profNaoMedico,
+          senhaHash: await argon2.hash(senha),
+          nomeCompleto: 'ProfNM Recepcao Dashboard E2E',
+          perfil: PerfilTipo.PROFISSIONAL_NAO_MEDICO,
+        },
       ],
     });
 
@@ -111,6 +119,7 @@ describe('RecepcaoDashboard (e2e)', () => {
     adminToken = await login(emails.admin);
     recepcaoToken = await login(emails.recepcao);
     medicoToken = await login(emails.medico);
+    profNaoMedicoToken = await login(emails.profNaoMedico);
   });
 
   afterEach(async () => {
@@ -137,11 +146,21 @@ describe('RecepcaoDashboard (e2e)', () => {
         'agendaDoDia',
         'aguardando',
         'confirmacoesPendentes',
+        'contagemPorStatus',
         'emAtendimento',
         'generatedAt',
         'listaEspera',
         'mensagensPendentes',
+        'totalAgenda',
       ]);
+      expect(res.body.data.contagemPorStatus).toEqual(
+        expect.objectContaining({
+          CONFIRMADO: expect.any(Number),
+          AGUARDANDO: expect.any(Number),
+          EM_ATENDIMENTO: expect.any(Number),
+        }),
+      );
+      expect(res.body.data.totalAgenda).toBe(res.body.data.agendaDoDia.length);
       expect(res.body.data.generatedAt).toEqual(expect.any(String));
       expect(new Date(res.body.data.generatedAt).toISOString()).toBe(
         res.body.data.generatedAt,
@@ -200,6 +219,44 @@ describe('RecepcaoDashboard (e2e)', () => {
       .query({ data: selectedDate })
       .set('Authorization', `Bearer ${medicoToken}`)
       .expect(403);
+  });
+
+  it('bloqueia profissional não médico no dashboard (403)', async () => {
+    await request(app.getHttpServer())
+      .get('/api/recepcao/dashboard')
+      .query({ data: selectedDate })
+      .set('Authorization', `Bearer ${profNaoMedicoToken}`)
+      .expect(403);
+  });
+
+  it('sem Authorization header retorna 401', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/recepcao/dashboard')
+      .query({ data: selectedDate })
+      .expect(401);
+
+    expect(res.body.success).toBe(false);
+    expect(res.body.data).toBeNull();
+  });
+
+  it('data com formato inválido retorna 400', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/recepcao/dashboard')
+      .query({ data: 'nao-eh-data' })
+      .set('Authorization', `Bearer ${recepcaoToken}`)
+      .expect(400);
+
+    expect(res.body.success).toBe(false);
+    expect(res.body.data).toBeNull();
+  });
+
+  it('data ausente retorna 400 (campo obrigatório)', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/recepcao/dashboard')
+      .set('Authorization', `Bearer ${recepcaoToken}`)
+      .expect(400);
+
+    expect(res.body.success).toBe(false);
   });
 
   it('retorna arrays vazios e generatedAt para data sem fixtures', async () => {

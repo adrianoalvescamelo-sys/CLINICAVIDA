@@ -11,12 +11,16 @@ import { AuditModule } from './audit/audit.module';
 import { HealthModule } from './health/health.module';
 import { PacientesModule } from './pacientes/pacientes.module';
 import { ProfissionaisModule } from './profissionais/profissionais.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
+import { ConfiguracoesModule } from './configuracoes/configuracoes.module';
 import { AgendaModule } from './agenda/agenda.module';
 import { BotModule } from './bot/bot.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ListaEsperaModule } from './lista-espera/lista-espera.module';
 import { RecepcaoModule } from './recepcao/recepcao.module';
 import { RelatoriosModule } from './relatorios/relatorios.module';
+import { ProntuarioModule } from './prontuario/prontuario.module';
+import { DocumentosModule } from './documentos/documentos.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TraceIdMiddleware } from './common/middleware/trace-id.middleware';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -49,12 +53,16 @@ import { ThrottlerProxyGuard } from './common/guards/throttler-proxy.guard';
     HealthModule,
     PacientesModule,
     ProfissionaisModule,
+    UsuariosModule,
+    ConfiguracoesModule,
     AgendaModule,
     BotModule,
     WhatsappModule,
     ListaEsperaModule,
     RecepcaoModule,
     RelatoriosModule,
+    ProntuarioModule,
+    DocumentosModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },

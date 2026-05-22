@@ -36,13 +36,13 @@ import { AuditService } from '../audit/audit.service';
 
 // ─── UUIDs e constantes ───────────────────────────────────────────────────────
 
-const UUID_MSG  = '11111111-1111-4111-8111-111111111111';
-const UUID_PAC  = '22222222-2222-4222-8222-222222222222';
-const UUID_AG   = '33333333-3333-4333-8333-333333333333';
+const UUID_MSG = '11111111-1111-4111-8111-111111111111';
+const UUID_PAC = '22222222-2222-4222-8222-222222222222';
+const UUID_AG = '33333333-3333-4333-8333-333333333333';
 const UUID_USER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-const EVENT_ID  = 'evt-test-0001';
-const TRACE     = 'test-trace-wa';
+const EVENT_ID = 'evt-test-0001';
+const TRACE = 'test-trace-wa';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +123,7 @@ function makeConfigMock(overrides: Record<string, unknown> = {}) {
     'whatsapp.n8nTimeoutMs': 10_000,
     'whatsapp.maxTentativas': 3,
     'whatsapp.limiteAutoHoras': 2,
+    'whatsapp.allowlist': [],
     ...overrides,
   };
   return {
@@ -147,17 +148,17 @@ describe('WhatsappService', () => {
 
   beforeEach(async () => {
     prisma = makePrismaMock();
-    http   = makeHttpMock();
+    http = makeHttpMock();
     config = makeConfigMock();
-    audit  = makeAuditMock();
+    audit = makeAuditMock();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WhatsappService,
-        { provide: PrismaService,  useValue: prisma },
-        { provide: HttpService,    useValue: http   },
-        { provide: ConfigService,  useValue: config  },
-        { provide: AuditService,   useValue: audit  },
+        { provide: PrismaService, useValue: prisma },
+        { provide: HttpService, useValue: http },
+        { provide: ConfigService, useValue: config },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -289,9 +290,9 @@ describe('WhatsappService', () => {
         providers: [
           WhatsappService,
           { provide: PrismaService, useValue: prisma },
-          { provide: HttpService,   useValue: http  },
+          { provide: HttpService, useValue: http },
           { provide: ConfigService, useValue: config },
-          { provide: AuditService,  useValue: audit },
+          { provide: AuditService, useValue: audit },
         ],
       }).compile();
       service = module.get<WhatsappService>(WhatsappService);
@@ -346,7 +347,9 @@ describe('WhatsappService', () => {
     it('falha HTTP (tentativa 1/3): status permanece PENDENTE com proximoRetryEm calculado', async () => {
       const msg = makeMensagem({ tentativas: 0 });
       prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
-      http.post.mockReturnValue(throwError(() => new Error('Connection refused')));
+      http.post.mockReturnValue(
+        throwError(() => new Error('Connection refused')),
+      );
       prisma.mensagemWhatsapp.update.mockResolvedValue({});
 
       await service.enviar(UUID_MSG);
@@ -384,7 +387,9 @@ describe('WhatsappService', () => {
     it('falha final (tentativa 3/3): status vira FALHA, proximoRetryEm=null, audit disparado', async () => {
       const msg = makeMensagem({ tentativas: 2 }); // 3 tentativas com esta = esgotado
       prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
-      http.post.mockReturnValue(throwError(() => new Error('Evolution API down')));
+      http.post.mockReturnValue(
+        throwError(() => new Error('Evolution API down')),
+      );
       prisma.mensagemWhatsapp.update.mockResolvedValue({});
 
       await service.enviar(UUID_MSG);
@@ -439,6 +444,78 @@ describe('WhatsappService', () => {
       expect(retryEm1.getTime()).toBeGreaterThan(retryEm0.getTime());
     });
 
+    // ── allowlist (rollout gradual) ──────────────────────────────────────────
+
+    async function rebuildService() {
+      const module = await Test.createTestingModule({
+        providers: [
+          WhatsappService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: HttpService, useValue: http },
+          { provide: ConfigService, useValue: config },
+          { provide: AuditService, useValue: audit },
+        ],
+      }).compile();
+      return module.get<WhatsappService>(WhatsappService);
+    }
+
+    it('allowlist preenchida + número FORA: força dry-run, não chama HTTP, marca ENVIADA', async () => {
+      config = makeConfigMock({ 'whatsapp.allowlist': ['66988887777'] });
+      service = await rebuildService();
+
+      const msg = makeMensagem({ telefone: '66999991111' }); // fora da allowlist
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+
+      await service.enviar(UUID_MSG);
+
+      expect(http.post).not.toHaveBeenCalled();
+      expect(prisma.mensagemWhatsapp.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: MensagemStatus.ENVIADA }),
+        }),
+      );
+    });
+
+    it('allowlist preenchida + número DENTRO: envia real via HTTP', async () => {
+      config = makeConfigMock({ 'whatsapp.allowlist': ['66999991111'] });
+      service = await rebuildService();
+
+      const msg = makeMensagem({ telefone: '66999991111' });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      http.post.mockReturnValue(of({ data: { ok: true }, status: 200 }));
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+
+      await service.enviar(UUID_MSG);
+
+      expect(http.post).toHaveBeenCalled();
+    });
+
+    it('allowlist casa por sufixo (com/sem DDI): 5566999991111 cobre 66999991111', async () => {
+      config = makeConfigMock({ 'whatsapp.allowlist': ['5566999991111'] });
+      service = await rebuildService();
+
+      const msg = makeMensagem({ telefone: '66999991111' });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      http.post.mockReturnValue(of({ data: { ok: true }, status: 200 }));
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+
+      await service.enviar(UUID_MSG);
+
+      expect(http.post).toHaveBeenCalled();
+    });
+
+    it('allowlist vazia: comportamento normal (envia para qualquer número)', async () => {
+      const msg = makeMensagem({ telefone: '66999991111' });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      http.post.mockReturnValue(of({ data: { ok: true }, status: 200 }));
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+
+      await service.enviar(UUID_MSG);
+
+      expect(http.post).toHaveBeenCalled();
+    });
+
     it('mensagem com status FALHA também é re-enviada', async () => {
       const msg = makeMensagem({ status: MensagemStatus.FALHA, tentativas: 0 });
       prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
@@ -465,7 +542,11 @@ describe('WhatsappService', () => {
   describe('marcarEntregue', () => {
     it('sucesso: atualiza status para ENTREGUE com entregueEm preenchido', async () => {
       const msg = makeMensagem({ status: MensagemStatus.ENVIADA });
-      const atualizada = { ...msg, status: MensagemStatus.ENTREGUE, providerMsgId: 'prov-123' };
+      const atualizada = {
+        ...msg,
+        status: MensagemStatus.ENTREGUE,
+        providerMsgId: 'prov-123',
+      };
       prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
       prisma.mensagemWhatsapp.update.mockResolvedValue(atualizada);
 
@@ -503,6 +584,122 @@ describe('WhatsappService', () => {
       expect(r1).toBeDefined();
       expect(r2).toBeDefined();
       expect(prisma.mensagemWhatsapp.update).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // marcarFalha
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('marcarFalha', () => {
+    it('sucesso: atualiza status para FALHA, salva erro, audita', async () => {
+      const msg = makeMensagem({ status: MensagemStatus.ENVIADA });
+      const atualizada = {
+        ...msg,
+        status: MensagemStatus.FALHA,
+        erro: 'rate limited by provider',
+        providerMsgId: 'prov-err-1',
+      };
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue(atualizada);
+
+      const result = await service.marcarFalha(
+        EVENT_ID,
+        'rate limited by provider',
+        'prov-err-1',
+      );
+
+      expect(result).toEqual(atualizada);
+      expect(prisma.mensagemWhatsapp.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: msg.id },
+          data: expect.objectContaining({
+            status: MensagemStatus.FALHA,
+            erro: 'rate limited by provider',
+            providerMsgId: 'prov-err-1',
+            proximoRetryEm: null,
+          }),
+        }),
+      );
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          acao: 'WHATSAPP_FALHA_CALLBACK',
+          resultado: AuditResultado.FALHA,
+          entidade: 'MensagemWhatsapp',
+          registroId: msg.id,
+        }),
+      );
+    });
+
+    it('retorna null quando eventId não encontrado (idempotência callback duplo)', async () => {
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(null);
+
+      const result = await service.marcarFalha('evt-inexistente', 'qualquer');
+
+      expect(result).toBeNull();
+      expect(prisma.mensagemWhatsapp.update).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+    });
+
+    it('idempotência: mensagem já em FALHA não re-audita nem re-atualiza', async () => {
+      const msg = makeMensagem({
+        status: MensagemStatus.FALHA,
+        erro: 'antigo',
+      });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+
+      const result = await service.marcarFalha(EVENT_ID, 'novo erro');
+
+      expect(result).toEqual(msg);
+      expect(prisma.mensagemWhatsapp.update).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+    });
+
+    it('preserva providerMsgId existente quando callback não traz novo', async () => {
+      const msg = makeMensagem({
+        status: MensagemStatus.ENVIADA,
+        providerMsgId: 'prov-prev',
+      });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue(msg);
+
+      await service.marcarFalha(EVENT_ID, 'erro sem providerMsgId');
+
+      expect(prisma.mensagemWhatsapp.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ providerMsgId: 'prov-prev' }),
+        }),
+      );
+    });
+
+    it('default erro quando callback sem campo erro', async () => {
+      const msg = makeMensagem({ status: MensagemStatus.ENVIADA });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue(msg);
+
+      await service.marcarFalha(EVENT_ID);
+
+      expect(prisma.mensagemWhatsapp.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            erro: 'callback do provedor retornou FALHA',
+          }),
+        }),
+      );
+    });
+
+    it('trunca erro longo para 500 caracteres', async () => {
+      const msg = makeMensagem({ status: MensagemStatus.ENVIADA });
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(msg);
+      prisma.mensagemWhatsapp.update.mockResolvedValue(msg);
+
+      const erroLongo = 'x'.repeat(800);
+      await service.marcarFalha(EVENT_ID, erroLongo);
+
+      const call = prisma.mensagemWhatsapp.update.mock.calls[0][0] as {
+        data: { erro: string };
+      };
+      expect(call.data.erro.length).toBe(500);
     });
   });
 
@@ -603,18 +800,81 @@ describe('WhatsappService', () => {
       expect(prisma.mensagemWhatsapp.update).not.toHaveBeenCalled();
     });
 
+    it('busca paciente pelo sufixo comparável de 8 dígitos (tolera 9º dígito)', async () => {
+      prisma.paciente.findFirst.mockResolvedValue(null);
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(null);
+      prisma.mensagemWhatsapp.findFirst.mockResolvedValue(null);
+      prisma.mensagemWhatsapp.create.mockResolvedValue(
+        makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+      );
+
+      // inbound veio SEM o 9º dígito
+      await service.receberResposta({ telefone: '556581305380', texto: 'sim' });
+
+      expect(prisma.paciente.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            telefoneWhatsapp: { contains: '81305380' },
+            deletedAt: null,
+          }),
+        }),
+      );
+    });
+
+    it('sem eventIdOriginal: acha confirmação OUTBOUND recente pelo telefone e confirma agendamento', async () => {
+      const original = makeMensagem({
+        tipo: MensagemTipo.CONFIRMACAO_24H,
+        agendamentoId: UUID_AG,
+        telefone: '5565981305380', // armazenado COM o 9
+      });
+      const agendamento = makeAgendamento({
+        dataHoraInicio: new Date(Date.now() + 6 * 3_600_000),
+        status: AgendamentoStatus.SOLICITADO,
+      });
+
+      prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
+      // sem eventIdOriginal → não busca por findUnique
+      prisma.mensagemWhatsapp.findFirst.mockResolvedValue(original); // fallback
+      prisma.mensagemWhatsapp.create.mockResolvedValue(
+        makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+      );
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+      prisma.agendamento.findUnique.mockResolvedValue(agendamento);
+      prisma.agendamento.update.mockResolvedValue({});
+      prisma.agendamentoHistorico.create.mockResolvedValue({});
+
+      // resposta chega SEM o 9º dígito
+      await service.receberResposta({ telefone: '556581305380', texto: 'SIM' });
+
+      expect(prisma.mensagemWhatsapp.findFirst).toHaveBeenCalled();
+      expect(prisma.agendamento.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: AgendamentoStatus.CONFIRMADO,
+          }),
+        }),
+      );
+    });
+
     it('normaliza telefone removendo caracteres não-dígitos para busca', async () => {
       prisma.paciente.findFirst.mockResolvedValue(null);
       prisma.mensagemWhatsapp.findUnique.mockResolvedValue(null);
-      prisma.mensagemWhatsapp.create.mockResolvedValue(makeMensagem({ direcao: MensagemDirecao.INBOUND }));
+      prisma.mensagemWhatsapp.create.mockResolvedValue(
+        makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+      );
 
-      await service.receberResposta({ telefone: '+55(66)99999-1111', texto: 'sim' });
+      await service.receberResposta({
+        telefone: '+55(66)99999-1111',
+        texto: 'sim',
+      });
 
       // Verifica que a busca usou apenas dígitos (via contains nos últimos 9 dígitos)
       expect(prisma.paciente.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            telefoneWhatsapp: expect.objectContaining({ contains: expect.any(String) }),
+            telefoneWhatsapp: expect.objectContaining({
+              contains: expect.any(String),
+            }),
           }),
         }),
       );
@@ -632,7 +892,9 @@ describe('WhatsappService', () => {
 
         prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
         prisma.mensagemWhatsapp.findUnique.mockResolvedValue(original);
-        prisma.mensagemWhatsapp.create.mockResolvedValue(makeMensagem({ direcao: MensagemDirecao.INBOUND }));
+        prisma.mensagemWhatsapp.create.mockResolvedValue(
+          makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+        );
         prisma.mensagemWhatsapp.update.mockResolvedValue({});
         prisma.agendamento.findUnique.mockResolvedValue(agendamento);
         prisma.agendamento.update.mockResolvedValue({});
@@ -663,7 +925,9 @@ describe('WhatsappService', () => {
 
         prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
         prisma.mensagemWhatsapp.findUnique.mockResolvedValue(original);
-        prisma.mensagemWhatsapp.create.mockResolvedValue(makeMensagem({ direcao: MensagemDirecao.INBOUND }));
+        prisma.mensagemWhatsapp.create.mockResolvedValue(
+          makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+        );
         prisma.mensagemWhatsapp.update.mockResolvedValue({});
         prisma.agendamento.findUnique.mockResolvedValue(agendamento);
         prisma.agendamento.update.mockResolvedValue({});
@@ -693,7 +957,9 @@ describe('WhatsappService', () => {
 
         prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
         prisma.mensagemWhatsapp.findUnique.mockResolvedValue(original);
-        prisma.mensagemWhatsapp.create.mockResolvedValue(makeMensagem({ direcao: MensagemDirecao.INBOUND }));
+        prisma.mensagemWhatsapp.create.mockResolvedValue(
+          makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+        );
         prisma.mensagemWhatsapp.update.mockResolvedValue({});
         prisma.agendamento.findUnique.mockResolvedValue(agendamento);
         prisma.agendamento.update.mockResolvedValue({});
@@ -725,7 +991,9 @@ describe('WhatsappService', () => {
 
         prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
         prisma.mensagemWhatsapp.findUnique.mockResolvedValue(original);
-        prisma.mensagemWhatsapp.create.mockResolvedValue(makeMensagem({ direcao: MensagemDirecao.INBOUND }));
+        prisma.mensagemWhatsapp.create.mockResolvedValue(
+          makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+        );
         prisma.mensagemWhatsapp.update.mockResolvedValue({});
         prisma.agendamento.findUnique.mockResolvedValue(agendamento);
 
@@ -745,7 +1013,9 @@ describe('WhatsappService', () => {
 
         prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
         prisma.mensagemWhatsapp.findUnique.mockResolvedValue(original);
-        prisma.mensagemWhatsapp.create.mockResolvedValue(makeMensagem({ direcao: MensagemDirecao.INBOUND }));
+        prisma.mensagemWhatsapp.create.mockResolvedValue(
+          makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+        );
         prisma.mensagemWhatsapp.update.mockResolvedValue({});
         prisma.agendamento.findUnique.mockResolvedValue(agendamento);
 
@@ -764,7 +1034,9 @@ describe('WhatsappService', () => {
 
         prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
         prisma.mensagemWhatsapp.findUnique.mockResolvedValue(original);
-        prisma.mensagemWhatsapp.create.mockResolvedValue(makeMensagem({ direcao: MensagemDirecao.INBOUND }));
+        prisma.mensagemWhatsapp.create.mockResolvedValue(
+          makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+        );
         prisma.mensagemWhatsapp.update.mockResolvedValue({});
         prisma.agendamento.findUnique.mockResolvedValue(null); // agendamento sumiu
 
@@ -787,7 +1059,9 @@ describe('WhatsappService', () => {
 
         prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
         prisma.mensagemWhatsapp.findUnique.mockResolvedValue(original);
-        prisma.mensagemWhatsapp.create.mockResolvedValue(makeMensagem({ direcao: MensagemDirecao.INBOUND }));
+        prisma.mensagemWhatsapp.create.mockResolvedValue(
+          makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+        );
         prisma.mensagemWhatsapp.update.mockResolvedValue({});
         prisma.agendamento.findUnique.mockResolvedValue(agendamento);
         prisma.agendamento.update.mockResolvedValue({});
@@ -822,7 +1096,9 @@ describe('WhatsappService', () => {
 
           prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
           prisma.mensagemWhatsapp.findUnique.mockResolvedValue(original);
-          prisma.mensagemWhatsapp.create.mockResolvedValue(makeMensagem({ direcao: MensagemDirecao.INBOUND }));
+          prisma.mensagemWhatsapp.create.mockResolvedValue(
+            makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+          );
           prisma.mensagemWhatsapp.update.mockResolvedValue({});
           prisma.agendamento.findUnique.mockResolvedValue(agendamento);
           prisma.agendamento.update.mockResolvedValue({});
@@ -836,7 +1112,9 @@ describe('WhatsappService', () => {
 
           expect(prisma.agendamento.update).toHaveBeenCalledWith(
             expect.objectContaining({
-              data: expect.objectContaining({ status: AgendamentoStatus.CONFIRMADO }),
+              data: expect.objectContaining({
+                status: AgendamentoStatus.CONFIRMADO,
+              }),
             }),
           );
         }
@@ -858,7 +1136,7 @@ describe('WhatsappService', () => {
 
       const result = await service.listarPendentes();
 
-      expect(result).toEqual(pendentes);
+      expect(result).toEqual({ items: pendentes, nextCursor: null });
       expect(prisma.mensagemWhatsapp.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -884,20 +1162,54 @@ describe('WhatsappService', () => {
       );
     });
 
-    it('retorna lista vazia quando não há pendências', async () => {
+    it('retorna página vazia quando não há pendências', async () => {
       prisma.mensagemWhatsapp.findMany.mockResolvedValue([]);
 
       const result = await service.listarPendentes();
-      expect(result).toHaveLength(0);
+      expect(result.items).toHaveLength(0);
+      expect(result.nextCursor).toBeNull();
     });
 
-    it('limita a 100 resultados', async () => {
+    it('default limit 50: take = 51 e nextCursor null quando rows ≤ 50', async () => {
       prisma.mensagemWhatsapp.findMany.mockResolvedValue([]);
 
       await service.listarPendentes();
 
       expect(prisma.mensagemWhatsapp.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 100 }),
+        expect.objectContaining({
+          take: 51,
+          skip: 0,
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        }),
+      );
+    });
+
+    it('paginação: rows > limit → nextCursor preenchido com último id', async () => {
+      const rows = Array.from({ length: 51 }, (_, i) =>
+        makeMensagem({
+          id: `11111111-1111-4111-8111-${String(i).padStart(12, '0')}`,
+        }),
+      );
+      prisma.mensagemWhatsapp.findMany.mockResolvedValue(rows);
+
+      const result = await service.listarPendentes();
+
+      expect(result.items).toHaveLength(50);
+      expect(result.nextCursor).toBe(rows[49].id);
+    });
+
+    it('paginação: cursor recebido aciona skip 1', async () => {
+      prisma.mensagemWhatsapp.findMany.mockResolvedValue([]);
+      const cursor = '99999999-9999-4999-8999-999999999999';
+
+      await service.listarPendentes({ cursor, limit: 10 });
+
+      expect(prisma.mensagemWhatsapp.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cursor: { id: cursor },
+          skip: 1,
+          take: 11,
+        }),
       );
     });
   });
@@ -920,12 +1232,16 @@ describe('WhatsappService', () => {
 
     it('sucesso: zera tentativas, seta PENDENTE, chama enviar e registra auditoria', async () => {
       const msg = makeMensagem({ status: MensagemStatus.FALHA, tentativas: 3 });
-      const msgAtualizada = { ...msg, status: MensagemStatus.PENDENTE, tentativas: 0 };
+      const msgAtualizada = {
+        ...msg,
+        status: MensagemStatus.PENDENTE,
+        tentativas: 0,
+      };
 
       // Primeira chamada findUnique: reenviarManual verifica existência
       // Segunda chamada findUnique: enviar lê a mensagem
       prisma.mensagemWhatsapp.findUnique
-        .mockResolvedValueOnce(msg)         // reenviarManual
+        .mockResolvedValueOnce(msg) // reenviarManual
         .mockResolvedValueOnce(msgAtualizada) // enviar
         .mockResolvedValueOnce(msgAtualizada); // findUnique final
 
@@ -959,7 +1275,11 @@ describe('WhatsappService', () => {
 
       prisma.mensagemWhatsapp.findUnique
         .mockResolvedValueOnce(msg)
-        .mockResolvedValueOnce({ ...msg, status: MensagemStatus.PENDENTE, tentativas: 0 })
+        .mockResolvedValueOnce({
+          ...msg,
+          status: MensagemStatus.PENDENTE,
+          tentativas: 0,
+        })
         .mockResolvedValueOnce(msgEnviada);
 
       prisma.mensagemWhatsapp.update.mockResolvedValue({});

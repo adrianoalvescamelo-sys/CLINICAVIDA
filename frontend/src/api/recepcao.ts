@@ -1,5 +1,6 @@
 import { api } from './client';
 import type {
+  PainelTVData,
   RecepcaoDashboard,
   RecepcaoDashboardParams,
 } from '../types/recepcao';
@@ -18,3 +19,11 @@ export async function obterDashboardRecepcao(
   );
   return data.data;
 }
+
+export async function obterPainelTV(dataAlvo: string): Promise<PainelTVData> {
+  const { data } = await api.get<Env<PainelTVData>>('/recepcao/painel-tv', {
+    params: { data: dataAlvo },
+  });
+  return data.data;
+}
+

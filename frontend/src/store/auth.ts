@@ -10,8 +10,10 @@ export interface AuthUser {
 
 interface AuthState {
   token: string | null;
+  refreshToken: string | null;
   user: AuthUser | null;
-  setSession: (token: string, user: AuthUser) => void;
+  setSession: (token: string, refreshToken: string, user: AuthUser) => void;
+  updateTokens: (token: string, refreshToken: string) => void;
   clear: () => void;
 }
 
@@ -19,9 +21,13 @@ export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       token: null,
+      refreshToken: null,
       user: null,
-      setSession: (token, user) => set({ token, user }),
-      clear: () => set({ token: null, user: null }),
+      setSession: (token, refreshToken, user) =>
+        set({ token, refreshToken, user }),
+      updateTokens: (token, refreshToken) =>
+        set({ token, refreshToken }),
+      clear: () => set({ token: null, refreshToken: null, user: null }),
     }),
     { name: 'clinicavida-auth' },
   ),

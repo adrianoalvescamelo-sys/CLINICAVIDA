@@ -7,9 +7,11 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { CursorPaginationDto } from '../common/pagination/cursor.dto';
 import { Request } from 'express';
 import { PerfilTipo } from '@prisma/client';
 import { WhatsappService } from './whatsapp.service';
@@ -33,6 +35,8 @@ export class WhatsappController {
   async callbackStatus(@Body() dto: CallbackStatusDto) {
     if (dto.status === 'ENTREGUE') {
       await this.wa.marcarEntregue(dto.eventId, dto.providerMsgId);
+    } else if (dto.status === 'FALHA') {
+      await this.wa.marcarFalha(dto.eventId, dto.erro, dto.providerMsgId);
     }
     return { ok: true };
   }
@@ -53,8 +57,8 @@ export class WhatsappController {
 
   @Get('whatsapp/pendentes')
   @Roles(PerfilTipo.ADMIN, PerfilTipo.RECEPCAO)
-  pendentes() {
-    return this.wa.listarPendentes();
+  pendentes(@Query() query: CursorPaginationDto) {
+    return this.wa.listarPendentes(query);
   }
 
   @Post('whatsapp/:id/reenviar')

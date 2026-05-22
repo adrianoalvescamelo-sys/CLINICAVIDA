@@ -11,15 +11,23 @@ interface Env<T> {
   data: T;
 }
 
+export interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;
+}
+
 export async function listarListaEspera(params?: {
   status?: ListaEsperaStatus;
   profissionalId?: string;
   pacienteId?: string;
   especialidade?: string;
-}): Promise<ListaEsperaItem[]> {
-  const { data } = await api.get<Env<ListaEsperaItem[]>>('/lista-espera', {
-    params,
-  });
+  cursor?: string;
+  limit?: number;
+}): Promise<CursorPage<ListaEsperaItem>> {
+  const { data } = await api.get<Env<CursorPage<ListaEsperaItem>>>(
+    '/lista-espera',
+    { params },
+  );
   return data.data;
 }
 

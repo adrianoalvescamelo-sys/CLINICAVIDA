@@ -13,6 +13,8 @@ import {
 import { v4 as uuid } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { paginateCursor, resolveTake } from '../common/pagination/cursor.dto';
+import { sufixoComparavelBR } from './phone-br.util';
 
 interface EnfileirarOpts {
   agendamentoId?: string;
@@ -84,7 +86,16 @@ export class WhatsappService {
     const maxTentativas = this.config.get<number>('whatsapp.maxTentativas')!;
     const webhookUrl = this.config.get<string>('whatsapp.n8nWebhookUrl')!;
     const timeoutMs = this.config.get<number>('whatsapp.n8nTimeoutMs')!;
-    const dryRun = this.config.get<boolean>('whatsapp.dryRun');
+    const dryRunGlobal = this.config.get<boolean>('whatsapp.dryRun');
+    const allowlist = this.config.get<string[]>('whatsapp.allowlist') ?? [];
+
+    // Rollout gradual: com allowlist preenchida, só números listados recebem
+    // envio real; os demais são forçados a dry-run (loga, não envia).
+    const telDigitos = msg.telefone.replace(/\D/g, '');
+    const bloqueadoPorAllowlist =
+      allowlist.length > 0 &&
+      !allowlist.some((a) => telDigitos.endsWith(a) || a.endsWith(telDigitos));
+    const dryRun = dryRunGlobal || bloqueadoPorAllowlist;
 
     const payload = msg.payload as { texto: string; vars?: unknown };
     const body = {
@@ -99,7 +110,16 @@ export class WhatsappService {
     try {
       if (dryRun || !webhookUrl) {
         this.logger.log(
-          { msgId: msg.id, dryRun: true, body },
+          {
+            msgId: msg.id,
+            dryRun: true,
+            motivoDryRun: bloqueadoPorAllowlist
+              ? 'allowlist'
+              : dryRunGlobal
+                ? 'global'
+                : 'sem-webhook',
+            body,
+          },
           'WhatsApp DRY-RUN — pulando envio HTTP',
         );
       } else {
@@ -170,6 +190,51 @@ export class WhatsappService {
     });
   }
 
+  async marcarFalha(eventId: string, erro?: string, providerMsgId?: string) {
+    const msg = await this.prisma.mensagemWhatsapp.findUnique({
+      where: { eventId },
+    });
+    if (!msg) return null;
+
+    // Idempotência: callback duplicado para mensagem já em FALHA não re-audita
+    if (msg.status === MensagemStatus.FALHA) {
+      return msg;
+    }
+
+    const motivo = (erro ?? 'callback do provedor retornou FALHA').slice(
+      0,
+      500,
+    );
+
+    const atualizada = await this.prisma.mensagemWhatsapp.update({
+      where: { id: msg.id },
+      data: {
+        status: MensagemStatus.FALHA,
+        erro: motivo,
+        providerMsgId: providerMsgId ?? msg.providerMsgId,
+        proximoRetryEm: null,
+      },
+    });
+
+    await this.audit.log({
+      usuarioId: null,
+      acao: 'WHATSAPP_FALHA_CALLBACK',
+      entidade: 'MensagemWhatsapp',
+      registroId: msg.id,
+      ipDispositivo: 'callback',
+      resultado: AuditResultado.FALHA,
+      traceId: msg.eventId,
+      detalhes: { motivo, providerMsgId: providerMsgId ?? msg.providerMsgId },
+    });
+
+    this.logger.warn(
+      { msgId: msg.id, eventId, motivo },
+      'WhatsApp marcado como FALHA via callback',
+    );
+
+    return atualizada;
+  }
+
   async receberResposta(opts: {
     eventIdOriginal?: string;
     telefone: string;
@@ -177,18 +242,37 @@ export class WhatsappService {
     providerMsgId?: string;
   }) {
     const limpo = opts.telefone.replace(/\D/g, '');
+    // Sufixo de 8 dígitos: tolera o 9º dígito ausente no JID do WhatsApp/Evolution.
+    const sufixo = sufixoComparavelBR(opts.telefone);
     const paciente = await this.prisma.paciente.findFirst({
       where: {
-        telefoneWhatsapp: { contains: limpo.slice(-9) },
+        telefoneWhatsapp: { contains: sufixo },
         deletedAt: null,
       },
     });
 
-    const original = opts.eventIdOriginal
+    let original = opts.eventIdOriginal
       ? await this.prisma.mensagemWhatsapp.findUnique({
           where: { eventId: opts.eventIdOriginal },
         })
       : null;
+
+    // Sem eventId vinculado (Evolution não ecoa o eventId): acha a confirmação
+    // OUTBOUND mais recente para este telefone (match tolerante ao 9º dígito)
+    // que tenha agendamento, para processar a resposta sobre ela.
+    if (!original) {
+      original = await this.prisma.mensagemWhatsapp.findFirst({
+        where: {
+          direcao: MensagemDirecao.OUTBOUND,
+          tipo: {
+            in: [MensagemTipo.CONFIRMACAO_24H, MensagemTipo.LEMBRETE_2H],
+          },
+          agendamentoId: { not: null },
+          telefone: { contains: sufixo },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     const agora = new Date();
     const eventId = uuid();
@@ -315,8 +399,8 @@ export class WhatsappService {
     });
   }
 
-  listarPendentes() {
-    return this.prisma.mensagemWhatsapp.findMany({
+  async listarPendentes(opts: { cursor?: string; limit?: number } = {}) {
+    const rows = await this.prisma.mensagemWhatsapp.findMany({
       where: {
         status: { in: [MensagemStatus.PENDENTE, MensagemStatus.FALHA] },
         direcao: MensagemDirecao.OUTBOUND,
@@ -327,9 +411,13 @@ export class WhatsappService {
           select: { id: true, dataHoraInicio: true, status: true },
         },
       },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
+      // tie-breaker estável por id para cursor pagination
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: resolveTake(opts.limit),
+      cursor: opts.cursor ? { id: opts.cursor } : undefined,
+      skip: opts.cursor ? 1 : 0,
     });
+    return paginateCursor(rows, opts.limit);
   }
 
   async reenviarManual(id: string, usuarioId: string, traceId: string) {

@@ -4,6 +4,18 @@ import HomePage from './pages/HomePage';
 import PacientesListPage from './pages/PacientesListPage';
 import PacienteNovoPage from './pages/PacienteNovoPage';
 import PacienteEditarPage from './pages/PacienteEditarPage';
+import ProfissionaisListPage from './pages/ProfissionaisListPage';
+import ProfissionalNovoPage from './pages/ProfissionalNovoPage';
+import ProfissionalEditarPage from './pages/ProfissionalEditarPage';
+import UsuariosListPage from './pages/UsuariosListPage';
+import UsuarioNovoPage from './pages/UsuarioNovoPage';
+import UsuarioEditarPage from './pages/UsuarioEditarPage';
+import UsuarioResetSenhaPage from './pages/UsuarioResetSenhaPage';
+import MinhaContaPage from './pages/MinhaContaPage';
+import ListaEsperaPage from './pages/ListaEsperaPage';
+import ListaEsperaNovoPage from './pages/ListaEsperaNovoPage';
+import BloqueiosPage from './pages/BloqueiosPage';
+import ConfiguracoesPage from './pages/ConfiguracoesPage';
 import AgendaPage from './pages/AgendaPage';
 import AgendaNovoPage from './pages/AgendaNovoPage';
 import WhatsappPendentesPage from './pages/WhatsappPendentesPage';
@@ -11,6 +23,7 @@ import RecepcaoPage from './pages/RecepcaoPage';
 import PainelTVPage from './pages/PainelTVPage';
 import RelatoriosPage from './pages/RelatoriosPage';
 import { useAuthStore } from './store/auth';
+import RoleRoute from './components/RoleRoute';
 
 function PrivateRoute({ children }: { children: JSX.Element }) {
   const token = useAuthStore((s) => s.token);
@@ -21,86 +34,76 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route
-        path="/"
-        element={
-          <PrivateRoute>
-            <HomePage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/pacientes"
-        element={
-          <PrivateRoute>
-            <PacientesListPage />
-          </PrivateRoute>
-        }
-      />
+
+      <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
+      <Route path="/agenda" element={<PrivateRoute><AgendaPage /></PrivateRoute>} />
+      <Route path="/recepcao" element={<PrivateRoute><RecepcaoPage /></PrivateRoute>} />
+      <Route path="/pacientes" element={<PrivateRoute><PacientesListPage /></PrivateRoute>} />
+      <Route path="/painel-tv" element={<PrivateRoute><PainelTVPage /></PrivateRoute>} />
+      <Route path="/profissionais" element={<PrivateRoute><ProfissionaisListPage /></PrivateRoute>} />
+
       <Route
         path="/pacientes/novo"
-        element={
-          <PrivateRoute>
-            <PacienteNovoPage />
-          </PrivateRoute>
-        }
+        element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><PacienteNovoPage /></RoleRoute>}
+      />
+      <Route path="/pacientes/:id" element={<PrivateRoute><PacienteEditarPage /></PrivateRoute>} />
+      <Route
+        path="/profissionais/novo"
+        element={<RoleRoute allow={['ADMIN']}><ProfissionalNovoPage /></RoleRoute>}
       />
       <Route
-        path="/pacientes/:id"
-        element={
-          <PrivateRoute>
-            <PacienteEditarPage />
-          </PrivateRoute>
-        }
+        path="/profissionais/:id"
+        element={<RoleRoute allow={['ADMIN']}><ProfissionalEditarPage /></RoleRoute>}
       />
       <Route
-        path="/agenda"
-        element={
-          <PrivateRoute>
-            <AgendaPage />
-          </PrivateRoute>
-        }
+        path="/usuarios"
+        element={<RoleRoute allow={['ADMIN']}><UsuariosListPage /></RoleRoute>}
+      />
+      <Route
+        path="/usuarios/novo"
+        element={<RoleRoute allow={['ADMIN']}><UsuarioNovoPage /></RoleRoute>}
+      />
+      <Route
+        path="/usuarios/:id"
+        element={<RoleRoute allow={['ADMIN']}><UsuarioEditarPage /></RoleRoute>}
+      />
+      <Route
+        path="/usuarios/:id/senha"
+        element={<RoleRoute allow={['ADMIN']}><UsuarioResetSenhaPage /></RoleRoute>}
+      />
+      <Route
+        path="/minha-conta"
+        element={<PrivateRoute><MinhaContaPage /></PrivateRoute>}
+      />
+      <Route
+        path="/lista-espera"
+        element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><ListaEsperaPage /></RoleRoute>}
+      />
+      <Route
+        path="/lista-espera/novo"
+        element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><ListaEsperaNovoPage /></RoleRoute>}
+      />
+      <Route
+        path="/bloqueios"
+        element={<RoleRoute allow={['ADMIN', 'MEDICO', 'PROFISSIONAL_NAO_MEDICO']}><BloqueiosPage /></RoleRoute>}
+      />
+      <Route
+        path="/configuracoes"
+        element={<RoleRoute allow={['ADMIN']}><ConfiguracoesPage /></RoleRoute>}
       />
       <Route
         path="/agenda/novo"
-        element={
-          <PrivateRoute>
-            <AgendaNovoPage />
-          </PrivateRoute>
-        }
+        element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><AgendaNovoPage /></RoleRoute>}
       />
       <Route
         path="/whatsapp"
-        element={
-          <PrivateRoute>
-            <WhatsappPendentesPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/recepcao"
-        element={
-          <PrivateRoute>
-            <RecepcaoPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/painel-tv"
-        element={
-          <PrivateRoute>
-            <PainelTVPage />
-          </PrivateRoute>
-        }
+        element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><WhatsappPendentesPage /></RoleRoute>}
       />
       <Route
         path="/relatorios"
-        element={
-          <PrivateRoute>
-            <RelatoriosPage />
-          </PrivateRoute>
-        }
+        element={<RoleRoute allow={['ADMIN', 'RECEPCAO']}><RelatoriosPage /></RoleRoute>}
       />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

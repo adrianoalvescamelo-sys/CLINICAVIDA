@@ -15,7 +15,7 @@ export class BotAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<Request>();
     const sent = req.header('x-bot-secret') ?? '';
-    const expected = this.config.get<string>('botSecret') ?? '';
+    const expected = this.config.get<string>('security.botSecret') ?? '';
 
     if (!expected || expected.length < 16) {
       throw new UnauthorizedException({

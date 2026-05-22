@@ -35,23 +35,23 @@ import {
 
 // ─── UUIDs e constantes de teste ──────────────────────────────────────────────
 
-const UUID_AG   = '11111111-1111-4111-8111-111111111111';
-const UUID_PAC  = '22222222-2222-4222-8222-222222222222';
+const UUID_AG = '11111111-1111-4111-8111-111111111111';
+const UUID_PAC = '22222222-2222-4222-8222-222222222222';
 const UUID_PROF = '33333333-3333-4333-8333-333333333333';
-const UUID_PROF2= '44444444-4444-4444-8444-444444444444';
+const UUID_PROF2 = '44444444-4444-4444-8444-444444444444';
 const UUID_USER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const UUID_BLOC = '55555555-5555-4555-8555-555555555555';
 
-const IP    = '127.0.0.1';
+const IP = '127.0.0.1';
 const TRACE = 'test-trace';
 
 // Horário futuro (6h à frente) para não cair na regra dos 2h de automação
 const INICIO = new Date(Date.now() + 6 * 3_600_000);
-const FIM    = new Date(Date.now() + 7 * 3_600_000);
+const FIM = new Date(Date.now() + 7 * 3_600_000);
 
 // Horário próximo (<2h) para testar LIMITE_AUTOMACAO_EXPIRADO
-const INICIO_PROXIMO = new Date(Date.now() + 30 * 60_000);   // +30min
-const FIM_PROXIMO    = new Date(Date.now() + 90 * 60_000);   // +90min
+const INICIO_PROXIMO = new Date(Date.now() + 30 * 60_000); // +30min
+const FIM_PROXIMO = new Date(Date.now() + 90 * 60_000); // +90min
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -168,13 +168,13 @@ describe('AgendaService', () => {
 
   beforeEach(async () => {
     prisma = makePrismaMock();
-    audit  = makeAuditMock();
+    audit = makeAuditMock();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AgendaService,
         { provide: PrismaService, useValue: prisma },
-        { provide: AuditService,  useValue: audit  },
+        { provide: AuditService, useValue: audit },
       ],
     }).compile();
 
@@ -190,11 +190,14 @@ describe('AgendaService', () => {
   describe('create', () => {
     it('sucesso: cria agendamento e registra histórico', async () => {
       const dto = makeCreateDto();
-      const ag  = makeAgendamento();
+      const ag = makeAgendamento();
 
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
-      prisma._tx.agendamento.findFirst.mockResolvedValue(null);   // sem conflito profissional
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
+      prisma._tx.agendamento.findFirst.mockResolvedValue(null); // sem conflito profissional
       prisma._tx.bloqueioAgenda.findFirst.mockResolvedValue(null); // sem bloqueio
       // findFirst para paciente (choque) também null
       prisma._tx.agendamento.create.mockResolvedValue(ag);
@@ -246,7 +249,10 @@ describe('AgendaService', () => {
 
     it('PROFISSIONAL_NAO_ENCONTRADO: profissional inativo lança NotFoundException', async () => {
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: false });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: false,
+      });
 
       await expect(
         service.create(makeCreateDto() as any, makeCtx(), {
@@ -259,14 +265,18 @@ describe('AgendaService', () => {
       const conflito = makeAgendamento();
 
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
 
       // $transaction chama fn(tx) — configuramos tx para retornar conflito na primeira chamada
       prisma.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
           agendamento: {
-            findFirst: jest.fn()
-              .mockResolvedValueOnce(conflito)  // conflito de profissional
+            findFirst: jest
+              .fn()
+              .mockResolvedValueOnce(conflito) // conflito de profissional
               .mockResolvedValue(null),
             create: jest.fn(),
           },
@@ -286,7 +296,10 @@ describe('AgendaService', () => {
         prisma.$transaction.mockImplementation(async (fn: any) => {
           const tx = {
             agendamento: {
-              findFirst: jest.fn().mockResolvedValueOnce(conflito).mockResolvedValue(null),
+              findFirst: jest
+                .fn()
+                .mockResolvedValueOnce(conflito)
+                .mockResolvedValue(null),
               create: jest.fn(),
             },
             bloqueioAgenda: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -307,14 +320,18 @@ describe('AgendaService', () => {
       const ag = makeAgendamento({ encaixe: true });
 
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
 
       prisma.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
           agendamento: {
-            findFirst: jest.fn()
-              .mockResolvedValueOnce(conflito)   // conflito profissional (mas encaixe=true → ignora)
-              .mockResolvedValue(null),           // sem choque de paciente
+            findFirst: jest
+              .fn()
+              .mockResolvedValueOnce(conflito) // conflito profissional (mas encaixe=true → ignora)
+              .mockResolvedValue(null), // sem choque de paciente
             create: jest.fn().mockResolvedValue(ag),
           },
           bloqueioAgenda: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -336,7 +353,10 @@ describe('AgendaService', () => {
       const bloqueio = makeBloqueio();
 
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
 
       prisma.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
@@ -359,8 +379,13 @@ describe('AgendaService', () => {
       try {
         prisma.$transaction.mockImplementation(async (fn: any) => {
           const tx = {
-            agendamento: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
-            bloqueioAgenda: { findFirst: jest.fn().mockResolvedValue(bloqueio) },
+            agendamento: {
+              findFirst: jest.fn().mockResolvedValue(null),
+              create: jest.fn(),
+            },
+            bloqueioAgenda: {
+              findFirst: jest.fn().mockResolvedValue(bloqueio),
+            },
             agendamentoHistorico: { create: jest.fn() },
           };
           return fn(tx);
@@ -378,14 +403,18 @@ describe('AgendaService', () => {
       const ag = makeAgendamento({ encaixe: true });
 
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
 
       prisma.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
           agendamento: {
-            findFirst: jest.fn()
-              .mockResolvedValueOnce(null)   // sem conflito profissional
-              .mockResolvedValue(null),       // sem choque de paciente
+            findFirst: jest
+              .fn()
+              .mockResolvedValueOnce(null) // sem conflito profissional
+              .mockResolvedValue(null), // sem choque de paciente
             create: jest.fn().mockResolvedValue(ag),
           },
           bloqueioAgenda: {
@@ -414,9 +443,10 @@ describe('AgendaService', () => {
       //  3. tx.agendamento.findFirst  → choque de paciente
       const makeTx = () => ({
         agendamento: {
-          findFirst: jest.fn()
-            .mockResolvedValueOnce(null)   // 1st call: sem conflito profissional
-            .mockResolvedValue(choque),    // 2nd call: choque de paciente
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(null) // 1st call: sem conflito profissional
+            .mockResolvedValue(choque), // 2nd call: choque de paciente
           create: jest.fn(),
         },
         bloqueioAgenda: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -424,7 +454,10 @@ describe('AgendaService', () => {
       });
 
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
       prisma.$transaction.mockImplementation(async (fn: any) => fn(makeTx()));
 
       await expect(
@@ -447,11 +480,10 @@ describe('AgendaService', () => {
       const existente = makeAgendamento({ eventId: 'evt-123' });
       prisma.agendamento.findUnique.mockResolvedValue(existente);
 
-      const result = await service.create(
-        makeCreateDto() as any,
-        makeCtx(),
-        { origem: AgendamentoOrigem.BOT_WHATSAPP, eventId: 'evt-123' },
-      );
+      const result = await service.create(makeCreateDto() as any, makeCtx(), {
+        origem: AgendamentoOrigem.BOT_WHATSAPP,
+        eventId: 'evt-123',
+      });
 
       expect(result).toEqual(existente);
       // Não deve chamar findFirst de paciente/profissional nem $transaction
@@ -464,7 +496,10 @@ describe('AgendaService', () => {
 
       prisma.agendamento.findUnique.mockResolvedValue(null); // novo event_id
       prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
-      prisma.profissional.findUnique.mockResolvedValue({ id: UUID_PROF, ativo: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        id: UUID_PROF,
+        ativo: true,
+      });
 
       prisma.$transaction.mockImplementation(async (fn: any) => {
         const tx = {
@@ -478,11 +513,10 @@ describe('AgendaService', () => {
         return fn(tx);
       });
 
-      const result = await service.create(
-        makeCreateDto() as any,
-        makeCtx(),
-        { origem: AgendamentoOrigem.BOT_WHATSAPP, eventId: 'evt-novo' },
-      );
+      const result = await service.create(makeCreateDto() as any, makeCtx(), {
+        origem: AgendamentoOrigem.BOT_WHATSAPP,
+        eventId: 'evt-novo',
+      });
 
       expect(result.eventId).toBe('evt-novo');
     });
@@ -501,7 +535,10 @@ describe('AgendaService', () => {
 
       expect(result).toEqual(lista);
       expect(prisma.agendamento.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ orderBy: { dataHoraInicio: 'asc' }, take: 500 }),
+        expect.objectContaining({
+          orderBy: { dataHoraInicio: 'asc' },
+          take: 500,
+        }),
       );
     });
 
@@ -527,7 +564,7 @@ describe('AgendaService', () => {
       prisma.agendamento.findMany.mockResolvedValue([]);
 
       const inicio = '2026-06-01T00:00:00.000Z';
-      const fim    = '2026-06-30T23:59:59.999Z';
+      const fim = '2026-06-30T23:59:59.999Z';
 
       await service.findAll({ inicio, fim } as any);
 
@@ -608,7 +645,10 @@ describe('AgendaService', () => {
 
       const result = await service.update(
         UUID_AG,
-        { status: AgendamentoStatus.CONFIRMADO, updatedAt: atualizadoEm.toISOString() },
+        {
+          status: AgendamentoStatus.CONFIRMADO,
+          updatedAt: atualizadoEm.toISOString(),
+        },
         makeCtx(),
       );
 
@@ -658,7 +698,11 @@ describe('AgendaService', () => {
 
       try {
         mockFindOne({ status: AgendamentoStatus.ATENDIDO });
-        await service.update(UUID_AG, { status: AgendamentoStatus.CONFIRMADO }, makeCtx());
+        await service.update(
+          UUID_AG,
+          { status: AgendamentoStatus.CONFIRMADO },
+          makeCtx(),
+        );
       } catch (e: any) {
         expect(e.response.code).toBe('TRANSICAO_INVALIDA');
       }
@@ -733,7 +777,9 @@ describe('AgendaService', () => {
       await expect(
         service.update(
           UUID_AG,
-          { dataHoraInicio: new Date(Date.now() + 5 * 3_600_000).toISOString() },
+          {
+            dataHoraInicio: new Date(Date.now() + 5 * 3_600_000).toISOString(),
+          },
           makeCtx(),
           AgendamentoOrigem.PACIENTE_WHATSAPP,
         ),
@@ -746,7 +792,9 @@ describe('AgendaService', () => {
         dataHoraFim: FIM,
         status: AgendamentoStatus.CONFIRMADO,
       });
-      const atualizado = makeAgendamento({ status: AgendamentoStatus.CANCELADO });
+      const atualizado = makeAgendamento({
+        status: AgendamentoStatus.CANCELADO,
+      });
       prisma.agendamento.update.mockResolvedValue(atualizado);
 
       // Não deve lançar
@@ -762,11 +810,17 @@ describe('AgendaService', () => {
 
     it('sem updatedAt no DTO: não verifica concorrência e atualiza normalmente', async () => {
       mockFindOne();
-      const atualizado = makeAgendamento({ status: AgendamentoStatus.CONFIRMADO });
+      const atualizado = makeAgendamento({
+        status: AgendamentoStatus.CONFIRMADO,
+      });
       prisma.agendamento.update.mockResolvedValue(atualizado);
 
       await expect(
-        service.update(UUID_AG, { status: AgendamentoStatus.CONFIRMADO }, makeCtx()),
+        service.update(
+          UUID_AG,
+          { status: AgendamentoStatus.CONFIRMADO },
+          makeCtx(),
+        ),
       ).resolves.toBeDefined();
     });
   });
@@ -836,20 +890,12 @@ describe('AgendaService', () => {
       prisma.agendamento.findFirst.mockResolvedValue(conflito);
 
       await expect(
-        service.criarBloqueio(
-          dto,
-          makeCtx(PerfilTipo.ADMIN),
-          undefined,
-        ),
+        service.criarBloqueio(dto, makeCtx(PerfilTipo.ADMIN), undefined),
       ).rejects.toThrow(ConflictException);
 
       try {
         prisma.agendamento.findFirst.mockResolvedValue(conflito);
-        await service.criarBloqueio(
-          dto,
-          makeCtx(PerfilTipo.ADMIN),
-          undefined,
-        );
+        await service.criarBloqueio(dto, makeCtx(PerfilTipo.ADMIN), undefined);
       } catch (e: any) {
         expect(e.response.code).toBe('AGENDAMENTO_NO_BLOQUEIO');
       }
@@ -867,7 +913,11 @@ describe('AgendaService', () => {
       prisma.bloqueioAgenda.delete.mockResolvedValue(undefined);
 
       await expect(
-        service.removerBloqueio(UUID_BLOC, makeCtx(PerfilTipo.ADMIN), UUID_PROF2),
+        service.removerBloqueio(
+          UUID_BLOC,
+          makeCtx(PerfilTipo.ADMIN),
+          UUID_PROF2,
+        ),
       ).resolves.toBeUndefined();
 
       expect(prisma.bloqueioAgenda.delete).toHaveBeenCalledWith({
@@ -881,7 +931,11 @@ describe('AgendaService', () => {
       prisma.bloqueioAgenda.delete.mockResolvedValue(undefined);
 
       await expect(
-        service.removerBloqueio(UUID_BLOC, makeCtx(PerfilTipo.MEDICO), UUID_PROF),
+        service.removerBloqueio(
+          UUID_BLOC,
+          makeCtx(PerfilTipo.MEDICO),
+          UUID_PROF,
+        ),
       ).resolves.toBeUndefined();
     });
 
@@ -889,12 +943,20 @@ describe('AgendaService', () => {
       prisma.bloqueioAgenda.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.removerBloqueio(UUID_BLOC, makeCtx(PerfilTipo.ADMIN), undefined),
+        service.removerBloqueio(
+          UUID_BLOC,
+          makeCtx(PerfilTipo.ADMIN),
+          undefined,
+        ),
       ).rejects.toThrow(NotFoundException);
 
       try {
         prisma.bloqueioAgenda.findUnique.mockResolvedValue(null);
-        await service.removerBloqueio(UUID_BLOC, makeCtx(PerfilTipo.ADMIN), undefined);
+        await service.removerBloqueio(
+          UUID_BLOC,
+          makeCtx(PerfilTipo.ADMIN),
+          undefined,
+        );
       } catch (e: any) {
         expect(e.response.code).toBe('BLOQUEIO_NAO_ENCONTRADO');
       }
@@ -905,12 +967,20 @@ describe('AgendaService', () => {
       prisma.bloqueioAgenda.findUnique.mockResolvedValue(bloqueio);
 
       await expect(
-        service.removerBloqueio(UUID_BLOC, makeCtx(PerfilTipo.MEDICO), UUID_PROF2),
+        service.removerBloqueio(
+          UUID_BLOC,
+          makeCtx(PerfilTipo.MEDICO),
+          UUID_PROF2,
+        ),
       ).rejects.toThrow(ForbiddenException);
 
       try {
         prisma.bloqueioAgenda.findUnique.mockResolvedValue(bloqueio);
-        await service.removerBloqueio(UUID_BLOC, makeCtx(PerfilTipo.MEDICO), UUID_PROF2);
+        await service.removerBloqueio(
+          UUID_BLOC,
+          makeCtx(PerfilTipo.MEDICO),
+          UUID_PROF2,
+        );
       } catch (e: any) {
         expect(e.response.code).toBe('FORBIDDEN');
       }

@@ -8,8 +8,6 @@ export class QueryPainelTvDto {
    */
   @IsOptional()
   @IsDateString()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   data?: string;
 }

@@ -40,11 +40,12 @@ import { AgendamentoStatus, PerfilTipo } from '@prisma/client';
 
 // ─── CPFs válidos matematicamente (dígitos verificadores corretos) ────────────
 // Validados com algoritmo de dígitos verificadores do CPF.
-const CPF_PACIENTE_AGENDA  = '71428793860';    // 714.287.938-60 (válido)
-const CPF_PACIENTE_ENCAIXE = '51621675335';    // 516.216.753-35 (válido, para teste de encaixe)
-const CPF_PACIENTE_BOT     = '66201476156';    // 662.014.761-56 (válido)
-const CPF_PACIENTE_BOT2    = '33401488139';    // 334.014.881-39 (válido)
-const BOT_SECRET = process.env.BOT_SECRET ?? 'test-bot-secret-clinicavida-2026-devonly';
+const CPF_PACIENTE_AGENDA = '71428793860'; // 714.287.938-60 (válido)
+const CPF_PACIENTE_ENCAIXE = '51621675335'; // 516.216.753-35 (válido, para teste de encaixe)
+const CPF_PACIENTE_BOT = '66201476156'; // 662.014.761-56 (válido)
+const CPF_PACIENTE_BOT2 = '33401488139'; // 334.014.881-39 (válido)
+const BOT_SECRET =
+  process.env.BOT_SECRET ?? 'test-bot-secret-clinicavida-2026-devonly';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -72,16 +73,16 @@ describe('Agenda (e2e) — Sprint 3', () => {
   let prisma: PrismaService;
 
   // tokens por perfil
-  let tokenAdmin:       string;
-  let tokenRecepcao:    string;
-  let tokenMedico:      string;
+  let tokenAdmin: string;
+  let tokenRecepcao: string;
+  let tokenMedico: string;
   let tokenProfissional: string;
 
   // IDs de entidades base criadas em beforeAll
-  let profissionalMedicoId:    string;    // vinculado ao usuário médico
-  let profissionalNaoMedicoId: string;    // vinculado ao usuário profissional
-  let pacienteId:              string;    // paciente padrão para testes
-  let pacienteEncaixeId:       string;    // segundo paciente, exclusivo para teste de encaixe
+  let profissionalMedicoId: string; // vinculado ao usuário médico
+  let profissionalNaoMedicoId: string; // vinculado ao usuário profissional
+  let pacienteId: string; // paciente padrão para testes
+  let pacienteEncaixeId: string; // segundo paciente, exclusivo para teste de encaixe
 
   // ─── setup global ─────────────────────────────────────────────────────────
 
@@ -93,7 +94,9 @@ describe('Agenda (e2e) — Sprint 3', () => {
     app = moduleRef.createNestApplication({ bufferLogs: true });
     app.useLogger(app.get(Logger));
     app.setGlobalPrefix('api', { exclude: ['health', 'ready'] });
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, transform: true }),
+    );
     app.useGlobalFilters(new AllExceptionsFilter(app.get(Logger)));
     await app.init();
 
@@ -103,10 +106,16 @@ describe('Agenda (e2e) — Sprint 3', () => {
     await cleanupPreviousRuns();
 
     // Cria usuários + tokens
-    tokenAdmin        = await criarTokenPara(PerfilTipo.ADMIN,                   'e2e-agenda-admin');
-    tokenRecepcao     = await criarTokenPara(PerfilTipo.RECEPCAO,                'e2e-agenda-recepcao');
-    tokenMedico       = await criarTokenPara(PerfilTipo.MEDICO,                  'e2e-agenda-medico');
-    tokenProfissional = await criarTokenPara(PerfilTipo.PROFISSIONAL_NAO_MEDICO, 'e2e-agenda-profnaomedico');
+    tokenAdmin = await criarTokenPara(PerfilTipo.ADMIN, 'e2e-agenda-admin');
+    tokenRecepcao = await criarTokenPara(
+      PerfilTipo.RECEPCAO,
+      'e2e-agenda-recepcao',
+    );
+    tokenMedico = await criarTokenPara(PerfilTipo.MEDICO, 'e2e-agenda-medico');
+    tokenProfissional = await criarTokenPara(
+      PerfilTipo.PROFISSIONAL_NAO_MEDICO,
+      'e2e-agenda-profnaomedico',
+    );
 
     // Obtém IDs dos usuários médico e profissional para criar registros em profissionais
     const usuarioMedico = await prisma.usuario.findFirst({
@@ -191,7 +200,10 @@ describe('Agenda (e2e) — Sprint 3', () => {
 
     // Pacientes de teste
     const cpfsAgenda = [
-      CPF_PACIENTE_AGENDA, CPF_PACIENTE_ENCAIXE, CPF_PACIENTE_BOT, CPF_PACIENTE_BOT2,
+      CPF_PACIENTE_AGENDA,
+      CPF_PACIENTE_ENCAIXE,
+      CPF_PACIENTE_BOT,
+      CPF_PACIENTE_BOT2,
     ];
     const pacientes = await prisma.paciente.findMany({
       where: { cpf: { in: cpfsAgenda } },
@@ -202,8 +214,12 @@ describe('Agenda (e2e) — Sprint 3', () => {
       await prisma.agendamentoHistorico.deleteMany({
         where: { agendamento: { pacienteId: { in: pacIds } } },
       });
-      await prisma.agendamento.deleteMany({ where: { pacienteId: { in: pacIds } } });
-      await prisma.mensagemWhatsapp.deleteMany({ where: { pacienteId: { in: pacIds } } });
+      await prisma.agendamento.deleteMany({
+        where: { pacienteId: { in: pacIds } },
+      });
+      await prisma.mensagemWhatsapp.deleteMany({
+        where: { pacienteId: { in: pacIds } },
+      });
       await prisma.paciente.deleteMany({ where: { id: { in: pacIds } } });
     }
 
@@ -218,9 +234,12 @@ describe('Agenda (e2e) — Sprint 3', () => {
 
   // ─── helper: cria usuário e retorna token ─────────────────────────────────
 
-  async function criarTokenPara(perfil: PerfilTipo, prefixo: string): Promise<string> {
+  async function criarTokenPara(
+    perfil: PerfilTipo,
+    prefixo: string,
+  ): Promise<string> {
     const email = uniqueEmail(prefixo);
-    const ip    = uniqueIp();
+    const ip = uniqueIp();
 
     await prisma.usuario.create({
       data: {
@@ -237,7 +256,9 @@ describe('Agenda (e2e) — Sprint 3', () => {
       .send({ email, senha: 'SenhaForte!2026' });
 
     if (res.status !== 200) {
-      throw new Error(`criarTokenPara(${perfil}) falhou: ${res.status} — ${JSON.stringify(res.body)}`);
+      throw new Error(
+        `criarTokenPara(${perfil}) falhou: ${res.status} — ${JSON.stringify(res.body)}`,
+      );
     }
 
     return res.body.data.access_token as string;
@@ -248,10 +269,10 @@ describe('Agenda (e2e) — Sprint 3', () => {
   async function criarAgendamento(
     token: string,
     overrides: Record<string, unknown> = {},
-    horaOffset = 3,  // horas a partir de agora para início
+    horaOffset = 3, // horas a partir de agora para início
   ): Promise<string> {
     const inicio = futureDate(horaOffset);
-    const fim    = futureDate(horaOffset + 1);
+    const fim = futureDate(horaOffset + 1);
 
     const res = await request(app.getHttpServer())
       .post('/api/agendamentos')
@@ -266,7 +287,9 @@ describe('Agenda (e2e) — Sprint 3', () => {
       });
 
     if (res.status !== 201) {
-      throw new Error(`criarAgendamento falhou: ${res.status} — ${JSON.stringify(res.body)}`);
+      throw new Error(
+        `criarAgendamento falhou: ${res.status} — ${JSON.stringify(res.body)}`,
+      );
     }
 
     return res.body.data.id as string;
@@ -286,7 +309,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
           pacienteId,
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(10),
-          dataHoraFim:    futureDate(11),
+          dataHoraFim: futureDate(11),
         })
         .expect(201);
 
@@ -306,7 +329,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
           pacienteId,
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(12),
-          dataHoraFim:    futureDate(13),
+          dataHoraFim: futureDate(13),
         })
         .expect(201);
 
@@ -318,7 +341,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
       // Cria o primeiro no horário 14h-15h
       await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(14),
-        dataHoraFim:    futureDate(15),
+        dataHoraFim: futureDate(15),
       });
 
       // Tenta criar outro no mesmo horário
@@ -330,7 +353,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
           pacienteId,
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(14),
-          dataHoraFim:    futureDate(15),
+          dataHoraFim: futureDate(15),
         })
         .expect(409);
 
@@ -342,7 +365,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
       // Cria o primeiro no horário 16h-17h para o profissional médico
       await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(16),
-        dataHoraFim:    futureDate(17),
+        dataHoraFim: futureDate(17),
         profissionalId: profissionalMedicoId,
       });
 
@@ -353,10 +376,10 @@ describe('Agenda (e2e) — Sprint 3', () => {
         .set('Authorization', `Bearer ${tokenAdmin}`)
         .set('x-forwarded-for', uniqueIp())
         .send({
-          pacienteId: pacienteEncaixeId,       // paciente diferente
+          pacienteId: pacienteEncaixeId, // paciente diferente
           profissionalId: profissionalMedicoId, // mesmo profissional → conflito, mas encaixe=true
           dataHoraInicio: futureDate(16),
-          dataHoraFim:    futureDate(17),
+          dataHoraFim: futureDate(17),
           encaixe: true,
         })
         .expect(201);
@@ -367,7 +390,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
 
     it('409 — PACIENTE_COM_AGENDAMENTO: mesmo paciente no mesmo horário', async () => {
       const inicio = futureDate(20);
-      const fim    = futureDate(21);
+      const fim = futureDate(21);
 
       // Cria primeiro agendamento para o paciente
       await request(app.getHttpServer())
@@ -409,7 +432,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
           pacienteId,
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(30),
-          dataHoraFim:    futureDate(31),
+          dataHoraFim: futureDate(31),
         })
         .expect(403);
 
@@ -426,7 +449,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
           pacienteId,
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(30),
-          dataHoraFim:    futureDate(31),
+          dataHoraFim: futureDate(31),
         })
         .expect(403);
 
@@ -442,7 +465,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
           pacienteId,
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(32),
-          dataHoraFim:    futureDate(33),
+          dataHoraFim: futureDate(33),
         })
         .expect(401);
 
@@ -546,7 +569,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
     beforeAll(async () => {
       agendamentoId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(40),
-        dataHoraFim:    futureDate(41),
+        dataHoraFim: futureDate(41),
       });
     }, 15_000);
 
@@ -586,19 +609,26 @@ describe('Agenda (e2e) — Sprint 3', () => {
     beforeAll(async () => {
       agendamentoId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(50),
-        dataHoraFim:    futureDate(51),
+        dataHoraFim: futureDate(51),
       });
-      const ag = await prisma.agendamento.findUnique({ where: { id: agendamentoId } });
+      const ag = await prisma.agendamento.findUnique({
+        where: { id: agendamentoId },
+      });
       updatedAt = ag!.updatedAt.toISOString();
     }, 15_000);
 
     it('200 — SOLICITADO → CONFIRMADO', async () => {
-      const ag = await prisma.agendamento.findUnique({ where: { id: agendamentoId } });
+      const ag = await prisma.agendamento.findUnique({
+        where: { id: agendamentoId },
+      });
       const res = await request(app.getHttpServer())
         .patch(`/api/agendamentos/${agendamentoId}`)
         .set('Authorization', `Bearer ${tokenAdmin}`)
         .set('x-forwarded-for', uniqueIp())
-        .send({ status: AgendamentoStatus.CONFIRMADO, updatedAt: ag!.updatedAt.toISOString() })
+        .send({
+          status: AgendamentoStatus.CONFIRMADO,
+          updatedAt: ag!.updatedAt.toISOString(),
+        })
         .expect(200);
 
       expect(res.body.success).toBe(true);
@@ -609,14 +639,16 @@ describe('Agenda (e2e) — Sprint 3', () => {
       // Cria agendamento separado e força status ATENDIDO diretamente no DB
       const atId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(52),
-        dataHoraFim:    futureDate(53),
+        dataHoraFim: futureDate(53),
       });
       await prisma.agendamento.update({
         where: { id: atId },
         data: { status: AgendamentoStatus.ATENDIDO },
       });
 
-      const agAtual = await prisma.agendamento.findUnique({ where: { id: atId } });
+      const agAtual = await prisma.agendamento.findUnique({
+        where: { id: atId },
+      });
 
       const res = await request(app.getHttpServer())
         .patch(`/api/agendamentos/${atId}`)
@@ -635,7 +667,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
     it('409 — CONCURRENT_UPDATE: updatedAt antigo', async () => {
       const atId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(54),
-        dataHoraFim:    futureDate(55),
+        dataHoraFim: futureDate(55),
       });
 
       const res = await request(app.getHttpServer())
@@ -661,7 +693,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
     it('200 — MEDICO chama paciente (muda status para EM_ATENDIMENTO)', async () => {
       const agId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(60),
-        dataHoraFim:    futureDate(61),
+        dataHoraFim: futureDate(61),
         profissionalId: profissionalMedicoId,
       });
 
@@ -678,7 +710,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
     it('200 — PROFISSIONAL_NAO_MEDICO chama paciente', async () => {
       const agId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(62),
-        dataHoraFim:    futureDate(63),
+        dataHoraFim: futureDate(63),
         profissionalId: profissionalNaoMedicoId,
       });
 
@@ -695,7 +727,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
     it('403 — RECEPCAO não pode chamar paciente', async () => {
       const agId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(64),
-        dataHoraFim:    futureDate(65),
+        dataHoraFim: futureDate(65),
       });
 
       const res = await request(app.getHttpServer())
@@ -717,7 +749,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
     it('200 — MEDICO marca como ATENDIDO', async () => {
       const agId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(70),
-        dataHoraFim:    futureDate(71),
+        dataHoraFim: futureDate(71),
       });
       // Coloca em EM_ATENDIMENTO primeiro
       await prisma.agendamento.update({
@@ -738,7 +770,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
     it('403 — RECEPCAO não pode marcar atendido', async () => {
       const agId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(72),
-        dataHoraFim:    futureDate(73),
+        dataHoraFim: futureDate(73),
       });
 
       const res = await request(app.getHttpServer())
@@ -759,7 +791,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
     it('200 — RECEPCAO marca falta', async () => {
       const agId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(80),
-        dataHoraFim:    futureDate(81),
+        dataHoraFim: futureDate(81),
       });
 
       const res = await request(app.getHttpServer())
@@ -775,7 +807,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
     it('403 — MEDICO não pode marcar falta', async () => {
       const agId = await criarAgendamento(tokenAdmin, {
         dataHoraInicio: futureDate(82),
-        dataHoraFim:    futureDate(83),
+        dataHoraFim: futureDate(83),
       });
 
       const res = await request(app.getHttpServer())
@@ -802,7 +834,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
         .send({
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(90),
-          dataHoraFim:    futureDate(91),
+          dataHoraFim: futureDate(91),
           motivo: 'Reunião de equipe',
         })
         .expect(201);
@@ -820,7 +852,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
         .send({
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(92),
-          dataHoraFim:    futureDate(93),
+          dataHoraFim: futureDate(93),
           motivo: 'Admin bloqueou',
         })
         .expect(201);
@@ -831,12 +863,12 @@ describe('Agenda (e2e) — Sprint 3', () => {
     it('403 — profissional tenta bloquear agenda de outro profissional', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/agendamentos/bloqueios')
-        .set('Authorization', `Bearer ${tokenProfissional}`)   // profissionalNaoMedicoId
+        .set('Authorization', `Bearer ${tokenProfissional}`) // profissionalNaoMedicoId
         .set('x-forwarded-for', uniqueIp())
         .send({
-          profissionalId: profissionalMedicoId,  // agenda do médico — não permitido
+          profissionalId: profissionalMedicoId, // agenda do médico — não permitido
           dataHoraInicio: futureDate(94),
-          dataHoraFim:    futureDate(95),
+          dataHoraFim: futureDate(95),
           motivo: 'Tentativa indevida',
         })
         .expect(403);
@@ -847,7 +879,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
 
     it('409 — AGENDAMENTO_NO_BLOQUEIO: bloquear período com agendamento ativo', async () => {
       const inicio = futureDate(96);
-      const fim    = futureDate(97);
+      const fim = futureDate(97);
 
       // Primeiro cria um agendamento no período
       await request(app.getHttpServer())
@@ -887,7 +919,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
         .send({
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(200),
-          dataHoraFim:    futureDate(201),
+          dataHoraFim: futureDate(201),
           motivo: 'Recepcao tentando bloquear',
         })
         .expect(403);
@@ -912,7 +944,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
         .send({
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(100),
-          dataHoraFim:    futureDate(101),
+          dataHoraFim: futureDate(101),
           motivo: 'Para deletar',
         })
         .expect(201);
@@ -952,7 +984,9 @@ describe('Agenda (e2e) — Sprint 3', () => {
 
     it('404 — ID inexistente retorna BLOQUEIO_NAO_ENCONTRADO', async () => {
       const res = await request(app.getHttpServer())
-        .delete('/api/agendamentos/bloqueios/00000000-0000-4000-8000-000000000099')
+        .delete(
+          '/api/agendamentos/bloqueios/00000000-0000-4000-8000-000000000099',
+        )
         .set('Authorization', `Bearer ${tokenAdmin}`)
         .set('x-forwarded-for', uniqueIp())
         .expect(404);
@@ -967,7 +1001,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
   // ═════════════════════════════════════════════════════════════════════════
 
   describe('POST /api/bot/pre-agendamento', () => {
-    const EVENT_ID_NOVO  = 'e2e-bot-event-001-fixture';
+    const EVENT_ID_NOVO = 'e2e-bot-event-001-fixture';
     const EVENT_ID_NOVO2 = 'e2e-bot-event-002-fixture';
 
     it('201 — pré-agendamento para paciente novo (cria paciente no processo)', async () => {
@@ -983,7 +1017,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
           dataNascimento: '1990-05-20',
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(110),
-          dataHoraFim:    futureDate(111),
+          dataHoraFim: futureDate(111),
         })
         .expect(201);
 
@@ -1000,11 +1034,11 @@ describe('Agenda (e2e) — Sprint 3', () => {
         .set('x-bot-secret', BOT_SECRET)
         .set('x-forwarded-for', uniqueIp())
         .send({
-          eventId: EVENT_ID_NOVO,   // mesmo eventId da chamada anterior
+          eventId: EVENT_ID_NOVO, // mesmo eventId da chamada anterior
           cpf: CPF_PACIENTE_BOT,
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(110),
-          dataHoraFim:    futureDate(111),
+          dataHoraFim: futureDate(111),
         })
         .expect(201);
 
@@ -1020,11 +1054,11 @@ describe('Agenda (e2e) — Sprint 3', () => {
         .set('x-forwarded-for', uniqueIp())
         .send({
           eventId: EVENT_ID_NOVO2,
-          cpf: CPF_PACIENTE_BOT2,    // CPF não cadastrado
+          cpf: CPF_PACIENTE_BOT2, // CPF não cadastrado
           // nomeCompleto ausente — deve retornar erro
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(112),
-          dataHoraFim:    futureDate(113),
+          dataHoraFim: futureDate(113),
         })
         .expect(400);
 
@@ -1041,7 +1075,7 @@ describe('Agenda (e2e) — Sprint 3', () => {
           cpf: CPF_PACIENTE_BOT,
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(114),
-          dataHoraFim:    futureDate(115),
+          dataHoraFim: futureDate(115),
         })
         .expect(401);
 
@@ -1058,11 +1092,115 @@ describe('Agenda (e2e) — Sprint 3', () => {
           cpf: CPF_PACIENTE_BOT,
           profissionalId: profissionalMedicoId,
           dataHoraInicio: futureDate(116),
-          dataHoraFim:    futureDate(117),
+          dataHoraFim: futureDate(117),
         })
         .expect(401);
 
       expect(res.body.success).toBe(false);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // Ownership enforcement (MEDICO/PROFISSIONAL_NAO_MEDICO)
+  // ═══════════════════════════════════════════════════════════════════════════════
+
+  describe('Ownership enforcement — restricted profiles can only access own agenda', () => {
+    let agOutroMedicoId: string;
+    let emailOutroMedico: string;
+
+    beforeAll(async () => {
+      emailOutroMedico = uniqueEmail('outro-medico-ownership');
+      const hashOutro = await argon2.hash('Senha@2026!');
+      const usuarioOutro = await prisma.usuario.create({
+        data: {
+          email: emailOutroMedico,
+          senhaHash: hashOutro,
+          nomeCompleto: 'Outro Médico Ownership Test',
+          perfil: PerfilTipo.MEDICO,
+          ativo: true,
+        },
+      });
+      const profOutro = await prisma.profissional.create({
+        data: {
+          nomeCompleto: 'Outro Médico Ownership Test',
+          ehMedico: true,
+          ativo: true,
+          usuarioId: usuarioOutro.id,
+        },
+      });
+
+      const future = new Date(Date.now() + 72 * 3_600_000);
+      const end = new Date(future.getTime() + 30 * 60_000);
+      const ag = await prisma.agendamento.create({
+        data: {
+          pacienteId: pacienteId,
+          profissionalId: profOutro.id,
+          dataHoraInicio: future,
+          dataHoraFim: end,
+          status: AgendamentoStatus.CONFIRMADO,
+          origem: 'RECEPCAO',
+          criadoPor: usuarioOutro.id,
+          atualizadoPor: usuarioOutro.id,
+        },
+      });
+      agOutroMedicoId = ag.id;
+    }, 20_000);
+
+    afterAll(async () => {
+      await prisma.agendamento.deleteMany({ where: { id: agOutroMedicoId } });
+      await prisma.profissional.deleteMany({
+        where: {
+          usuarioId: { not: null },
+          nomeCompleto: 'Outro Médico Ownership Test',
+        },
+      });
+      await prisma.usuario.deleteMany({ where: { email: emailOutroMedico } });
+    });
+
+    it('MEDICO cannot GET appointment of another profissional → 403', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/agendamentos/${agOutroMedicoId}`)
+        .set('Authorization', `Bearer ${tokenMedico}`)
+        .set('x-forwarded-for', uniqueIp());
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('FORBIDDEN');
+    });
+
+    it('PROFISSIONAL_NAO_MEDICO cannot GET appointment of another profissional → 403', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/agendamentos/${agOutroMedicoId}`)
+        .set('Authorization', `Bearer ${tokenProfissional}`)
+        .set('x-forwarded-for', uniqueIp());
+      expect(res.status).toBe(403);
+      expect(res.body.success).toBe(false);
+    });
+
+    it('MEDICO GET /agendamentos — response never includes other profissional appointments', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/agendamentos')
+        .set('Authorization', `Bearer ${tokenMedico}`)
+        .set('x-forwarded-for', uniqueIp());
+      expect(res.status).toBe(200);
+      const ids: string[] = res.body.data.map((a: any) => a.id);
+      expect(ids).not.toContain(agOutroMedicoId);
+    });
+
+    it('MEDICO cannot POST /:id/chamar on another profissional appointment → 403', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`/api/agendamentos/${agOutroMedicoId}/chamar`)
+        .set('Authorization', `Bearer ${tokenMedico}`)
+        .set('x-forwarded-for', uniqueIp());
+      expect(res.status).toBe(403);
+    });
+
+    it('ADMIN can GET any appointment → 200', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/agendamentos/${agOutroMedicoId}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .set('x-forwarded-for', uniqueIp());
+      expect(res.status).toBe(200);
+      expect(res.body.data.id).toBe(agOutroMedicoId);
     });
   });
 });

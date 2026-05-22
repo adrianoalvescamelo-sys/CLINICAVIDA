@@ -25,7 +25,12 @@ import {
 } from '../common/decorators/current-user.decorator';
 
 @Controller('pacientes')
-@Roles(PerfilTipo.ADMIN, PerfilTipo.RECEPCAO, PerfilTipo.MEDICO, PerfilTipo.PROFISSIONAL_NAO_MEDICO)
+@Roles(
+  PerfilTipo.ADMIN,
+  PerfilTipo.RECEPCAO,
+  PerfilTipo.MEDICO,
+  PerfilTipo.PROFISSIONAL_NAO_MEDICO,
+)
 export class PacientesController {
   constructor(private readonly pacientes: PacientesService) {}
 
@@ -46,8 +51,11 @@ export class PacientesController {
   }
 
   @Get(':id')
-  findOne(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.pacientes.findOne(id);
+  findOne(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pacientes.findOne(id, user.perfil as PerfilTipo);
   }
 
   @Get(':id/historico')
