@@ -113,9 +113,15 @@ sudo docker compose --env-file .env.homolog -f docker-compose.homolog.yml up -d 
 3. Esperado: WhatsApp real do número do app; mensagem `ENVIADA` → `ENTREGUE`.
 4. Número fora da allowlist → log `motivoDryRun: "allowlist"`, nada enviado.
 
-## ⚠️ Limitação conhecida — resposta SIM/NÃO não confirma agendamento ainda
+## ✅ Resposta SIM/NÃO confirma agendamento (resolvido)
 
-Inbound da Evolution não traz o `eventId` original. `receberResposta` só dispara
-confirmação/cancelamento com `eventIdOriginal`; sem ele, registra a resposta mas
-não muda o status. **Follow-up (PR backend):** localizar a última msg OUTBOUND de
-confirmação por telefone e processar sobre ela. Até lá, recepção confirma manual.
+Commit `4ec515a`: `receberResposta`, quando o inbound não traz `eventIdOriginal`
+(Evolution não ecoa), acha a última msg OUTBOUND de confirmação
+(`CONFIRMACAO_24H`/`LEMBRETE_2H`) do telefone com agendamento e processa a
+resposta sobre ela. Match de telefone usa sufixo de 8 dígitos
+(`sufixoComparavelBR`), tolerante ao 9º dígito ausente no JID do WhatsApp
+(ex: `556581305380` casa com `5565981305380`). Validado em homolog:
+SIM → `CONFIRMADO`.
+
+Regra de janela mantida: SIM ≥2h → CONFIRMADO; SIM <2h → CONFIRMACAO_TARDIA;
+NÃO ≥2h → CANCELADO; NÃO <2h → recepção decide (não cancela auto).
