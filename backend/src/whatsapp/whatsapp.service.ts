@@ -14,6 +14,7 @@ import { v4 as uuid } from 'uuid';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { paginateCursor, resolveTake } from '../common/pagination/cursor.dto';
+import { sufixoComparavelBR } from './phone-br.util';
 
 interface EnfileirarOpts {
   agendamentoId?: string;
@@ -93,9 +94,7 @@ export class WhatsappService {
     const telDigitos = msg.telefone.replace(/\D/g, '');
     const bloqueadoPorAllowlist =
       allowlist.length > 0 &&
-      !allowlist.some(
-        (a) => telDigitos.endsWith(a) || a.endsWith(telDigitos),
-      );
+      !allowlist.some((a) => telDigitos.endsWith(a) || a.endsWith(telDigitos));
     const dryRun = dryRunGlobal || bloqueadoPorAllowlist;
 
     const payload = msg.payload as { texto: string; vars?: unknown };
@@ -243,18 +242,37 @@ export class WhatsappService {
     providerMsgId?: string;
   }) {
     const limpo = opts.telefone.replace(/\D/g, '');
+    // Sufixo de 8 dígitos: tolera o 9º dígito ausente no JID do WhatsApp/Evolution.
+    const sufixo = sufixoComparavelBR(opts.telefone);
     const paciente = await this.prisma.paciente.findFirst({
       where: {
-        telefoneWhatsapp: { contains: limpo.slice(-9) },
+        telefoneWhatsapp: { contains: sufixo },
         deletedAt: null,
       },
     });
 
-    const original = opts.eventIdOriginal
+    let original = opts.eventIdOriginal
       ? await this.prisma.mensagemWhatsapp.findUnique({
           where: { eventId: opts.eventIdOriginal },
         })
       : null;
+
+    // Sem eventId vinculado (Evolution não ecoa o eventId): acha a confirmação
+    // OUTBOUND mais recente para este telefone (match tolerante ao 9º dígito)
+    // que tenha agendamento, para processar a resposta sobre ela.
+    if (!original) {
+      original = await this.prisma.mensagemWhatsapp.findFirst({
+        where: {
+          direcao: MensagemDirecao.OUTBOUND,
+          tipo: {
+            in: [MensagemTipo.CONFIRMACAO_24H, MensagemTipo.LEMBRETE_2H],
+          },
+          agendamentoId: { not: null },
+          telefone: { contains: sufixo },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     const agora = new Date();
     const eventId = uuid();

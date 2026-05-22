@@ -800,6 +800,62 @@ describe('WhatsappService', () => {
       expect(prisma.mensagemWhatsapp.update).not.toHaveBeenCalled();
     });
 
+    it('busca paciente pelo sufixo comparável de 8 dígitos (tolera 9º dígito)', async () => {
+      prisma.paciente.findFirst.mockResolvedValue(null);
+      prisma.mensagemWhatsapp.findUnique.mockResolvedValue(null);
+      prisma.mensagemWhatsapp.findFirst.mockResolvedValue(null);
+      prisma.mensagemWhatsapp.create.mockResolvedValue(
+        makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+      );
+
+      // inbound veio SEM o 9º dígito
+      await service.receberResposta({ telefone: '556581305380', texto: 'sim' });
+
+      expect(prisma.paciente.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            telefoneWhatsapp: { contains: '81305380' },
+            deletedAt: null,
+          }),
+        }),
+      );
+    });
+
+    it('sem eventIdOriginal: acha confirmação OUTBOUND recente pelo telefone e confirma agendamento', async () => {
+      const original = makeMensagem({
+        tipo: MensagemTipo.CONFIRMACAO_24H,
+        agendamentoId: UUID_AG,
+        telefone: '5565981305380', // armazenado COM o 9
+      });
+      const agendamento = makeAgendamento({
+        dataHoraInicio: new Date(Date.now() + 6 * 3_600_000),
+        status: AgendamentoStatus.SOLICITADO,
+      });
+
+      prisma.paciente.findFirst.mockResolvedValue({ id: UUID_PAC });
+      // sem eventIdOriginal → não busca por findUnique
+      prisma.mensagemWhatsapp.findFirst.mockResolvedValue(original); // fallback
+      prisma.mensagemWhatsapp.create.mockResolvedValue(
+        makeMensagem({ direcao: MensagemDirecao.INBOUND }),
+      );
+      prisma.mensagemWhatsapp.update.mockResolvedValue({});
+      prisma.agendamento.findUnique.mockResolvedValue(agendamento);
+      prisma.agendamento.update.mockResolvedValue({});
+      prisma.agendamentoHistorico.create.mockResolvedValue({});
+
+      // resposta chega SEM o 9º dígito
+      await service.receberResposta({ telefone: '556581305380', texto: 'SIM' });
+
+      expect(prisma.mensagemWhatsapp.findFirst).toHaveBeenCalled();
+      expect(prisma.agendamento.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: AgendamentoStatus.CONFIRMADO,
+          }),
+        }),
+      );
+    });
+
     it('normaliza telefone removendo caracteres não-dígitos para busca', async () => {
       prisma.paciente.findFirst.mockResolvedValue(null);
       prisma.mensagemWhatsapp.findUnique.mockResolvedValue(null);
