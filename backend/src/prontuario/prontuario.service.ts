@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { AuditResultado, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -62,6 +66,40 @@ export class ProntuarioService {
     });
 
     return { prontuario: pront, evolucoes };
+  }
+
+  async obterEvolucao(
+    evolucaoId: string,
+    user: AuthUser,
+    ip: string,
+    trace: string,
+  ) {
+    const evo = await this.prisma.evolucao.findUnique({
+      where: { id: evolucaoId },
+      include: { replaces: true, replacedBy: true },
+    });
+    // não-médico só acessa as próprias → trata como inexistente (404)
+    if (
+      !evo ||
+      (!this.isMedicoOuAdmin(user) && evo.autorUsuarioId !== user.id)
+    ) {
+      throw new NotFoundException({
+        code: 'EVOLUCAO_NAO_ENCONTRADA',
+        message: 'Evolução não encontrada',
+      });
+    }
+
+    await this.audit.log({
+      usuarioId: user.id,
+      acao: 'VISUALIZACAO_EVOLUCAO',
+      entidade: 'Evolucao',
+      registroId: evo.id,
+      ipDispositivo: ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: trace,
+    });
+
+    return evo;
   }
 
   async criarEvolucao(

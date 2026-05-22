@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { AuditResultado } from '@prisma/client';
 import { ProntuarioService } from './prontuario.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -186,6 +186,31 @@ describe('ProntuarioService', () => {
       prisma.prontuario.findUnique.mockResolvedValue(null);
       const r = await service.listarProntuario(PAC, MEDICO as never, 'ip', 't');
       expect(r.evolucoes).toEqual([]);
+    });
+  });
+
+  describe('obterEvolucao', () => {
+    it('retorna evolução e audita VISUALIZACAO_EVOLUCAO', async () => {
+      prisma.evolucao.findUnique.mockResolvedValue({ id: EVO, autorUsuarioId: MEDICO.id });
+      const r = await service.obterEvolucao(EVO, MEDICO as never, 'ip', 't');
+      expect(r.id).toBe(EVO);
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ acao: 'VISUALIZACAO_EVOLUCAO', registroId: EVO }),
+      );
+    });
+
+    it('não-médico tentando ler evolução de outro: 404', async () => {
+      prisma.evolucao.findUnique.mockResolvedValue({ id: EVO, autorUsuarioId: 'outro' });
+      await expect(
+        service.obterEvolucao(EVO, NAOMED as never, 'ip', 't'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('evolução inexistente: 404', async () => {
+      prisma.evolucao.findUnique.mockResolvedValue(null);
+      await expect(
+        service.obterEvolucao(EVO, MEDICO as never, 'ip', 't'),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });
