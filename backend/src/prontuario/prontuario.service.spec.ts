@@ -151,4 +151,41 @@ describe('ProntuarioService', () => {
       expect(prisma.evolucao.create).not.toHaveBeenCalled();
     });
   });
+
+  describe('listarProntuario', () => {
+    it('médico vê todas as evoluções atuais e audita visualização', async () => {
+      prisma.prontuario.findUnique.mockResolvedValue({ id: PRONT, pacienteId: PAC });
+      prisma.evolucao.findMany.mockResolvedValue([{ id: EVO }]);
+
+      const r = await service.listarProntuario(PAC, MEDICO as never, 'ip', 't');
+
+      expect(r.evolucoes).toHaveLength(1);
+      expect(prisma.evolucao.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ prontuarioId: PRONT, replacedBy: null }),
+        }),
+      );
+      const whereArg = prisma.evolucao.findMany.mock.calls[0][0].where;
+      expect(whereArg.autorUsuarioId).toBeUndefined();
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({ acao: 'VISUALIZACAO_PRONTUARIO' }),
+      );
+    });
+
+    it('não-médico só vê as próprias evoluções (filtro autorUsuarioId)', async () => {
+      prisma.prontuario.findUnique.mockResolvedValue({ id: PRONT, pacienteId: PAC });
+      prisma.evolucao.findMany.mockResolvedValue([]);
+
+      await service.listarProntuario(PAC, NAOMED as never, 'ip', 't');
+
+      const whereArg = prisma.evolucao.findMany.mock.calls[0][0].where;
+      expect(whereArg.autorUsuarioId).toBe(NAOMED.id);
+    });
+
+    it('prontuário inexistente: retorna evoluções vazias (não 404)', async () => {
+      prisma.prontuario.findUnique.mockResolvedValue(null);
+      const r = await service.listarProntuario(PAC, MEDICO as never, 'ip', 't');
+      expect(r.evolucoes).toEqual([]);
+    });
+  });
 });

@@ -21,6 +21,49 @@ export class ProntuarioService {
     return user.perfil === 'MEDICO';
   }
 
+  private isMedicoOuAdmin(user: AuthUser): boolean {
+    return user.perfil === 'MEDICO' || user.perfil === 'ADMIN';
+  }
+
+  async listarProntuario(
+    pacienteId: string,
+    user: AuthUser,
+    ip: string,
+    trace: string,
+  ) {
+    const pront = await this.prisma.prontuario.findUnique({
+      where: { pacienteId },
+    });
+
+    let evolucoes: unknown[] = [];
+    if (pront) {
+      const where: Prisma.EvolucaoWhereInput = {
+        prontuarioId: pront.id,
+        replacedBy: null, // apenas versões atuais
+      };
+      if (!this.isMedicoOuAdmin(user)) {
+        where.autorUsuarioId = user.id;
+      }
+      evolucoes = await this.prisma.evolucao.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    await this.audit.log({
+      usuarioId: user.id,
+      acao: 'VISUALIZACAO_PRONTUARIO',
+      entidade: 'Prontuario',
+      registroId: pront?.id ?? null,
+      ipDispositivo: ip,
+      resultado: AuditResultado.SUCESSO,
+      traceId: trace,
+      detalhes: { pacienteId } as Prisma.InputJsonValue,
+    });
+
+    return { prontuario: pront, evolucoes };
+  }
+
   async criarEvolucao(
     pacienteId: string,
     dto: CriarEvolucaoDto,
