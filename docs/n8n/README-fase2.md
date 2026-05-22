@@ -15,7 +15,7 @@ A VPS roda **outro sistema** (bot **financeiro**,
   instância → app e financeiro não podem dividir o mesmo número no inbound.
 
 **Decisão (2026-05-21):** o app Clínica Vida usa uma **instância Evolution
-SEPARADA** (`clinicavida-app`) com **número próprio**. Assim o inbound não
+SEPARADA** (`appclinica`) com **número próprio**. Assim o inbound não
 conflita com o financeiro.
 
 ## Topologia — comunicação por rede Docker interna
@@ -27,10 +27,10 @@ interno do Docker**.
 ```
 backend (clinicavida-api-homolog:3000)
   → POST n8n http://n8n-upbl-n8n-1:5678/webhook/clinicavida-outbound
-      → POST Evolution http://evolution-api-vyes-api-1:8080/message/sendText/clinicavida-app → WhatsApp
+      → POST Evolution http://evolution-api-vyes-api-1:8080/message/sendText/appclinica → WhatsApp
       → POST backend http://clinicavida-api-homolog:3000/api/bot/whatsapp/status
 
-WhatsApp (nº do app) → Evolution inst. clinicavida-app (MESSAGES_UPSERT)
+WhatsApp (nº do app) → Evolution inst. appclinica (MESSAGES_UPSERT)
   → POST n8n http://n8n-upbl-n8n-1:5678/webhook/clinicavida-inbound
       → POST backend http://clinicavida-api-homolog:3000/api/bot/whatsapp/inbound
 ```
@@ -53,7 +53,7 @@ sudo docker network connect clinicavida-homolog_clinicavida-net n8n-upbl-n8n-1  
 > `n8n-upbl_default`). A conexão `n8n-upbl-n8n-1`↔clinicavida-net é runtime —
 > re-rodar se a stack n8n for recriada.
 
-## 1. Criar e parear a instância `clinicavida-app` (número novo)
+## 1. Criar e parear a instância `appclinica` (número novo)
 
 Na VPS (usa `127.0.0.1:32778`; apikey global da Evolution):
 
@@ -62,9 +62,9 @@ K="<APIKEY_EVOLUTION>"
 # cria instância
 curl -X POST 'http://127.0.0.1:32778/instance/create' \
   -H "apikey: $K" -H 'Content-Type: application/json' \
-  -d '{"instanceName":"clinicavida-app","integration":"WHATSAPP-BAILEYS","qrcode":true}'
+  -d '{"instanceName":"appclinica","integration":"WHATSAPP-BAILEYS","qrcode":true}'
 # pega QR pra parear o número novo (escanear no WhatsApp do app)
-curl "http://127.0.0.1:32778/instance/connect/clinicavida-app" -H "apikey: $K"
+curl "http://127.0.0.1:32778/instance/connect/appclinica" -H "apikey: $K"
 ```
 
 Escanear o QR com o **chip/número do app**. Conferir `connectionStatus: open`:
@@ -72,13 +72,13 @@ Escanear o QR com o **chip/número do app**. Conferir `connectionStatus: open`:
 curl "http://127.0.0.1:32778/instance/fetchInstances" -H "apikey: $K"
 ```
 
-## 2. Webhook da instância `clinicavida-app` → n8n inbound
+## 2. Webhook da instância `appclinica` → n8n inbound
 
-> Só na instância `clinicavida-app`. **Nunca** rodar `webhook/set` na instância
+> Só na instância `appclinica`. **Nunca** rodar `webhook/set` na instância
 > `clinicavida` (financeiro).
 
 ```bash
-curl -X POST 'http://127.0.0.1:32778/webhook/set/clinicavida-app' \
+curl -X POST 'http://127.0.0.1:32778/webhook/set/appclinica' \
   -H "apikey: $K" -H 'Content-Type: application/json' \
   -d '{"webhook":{"enabled":true,"url":"http://n8n-upbl-n8n-1:5678/webhook/clinicavida-inbound","webhookByEvents":false,"events":["MESSAGES_UPSERT"]}}'
 ```
@@ -86,7 +86,7 @@ curl -X POST 'http://127.0.0.1:32778/webhook/set/clinicavida-app' \
 ## 3. Importar + ativar os workflows no n8n
 
 UI n8n → **Workflows → Import from File**:
-1. [`clinicavida-outbound.json`](./clinicavida-outbound.json) (chama `sendText/clinicavida-app`)
+1. [`clinicavida-outbound.json`](./clinicavida-outbound.json) (chama `sendText/appclinica`)
 2. [`clinicavida-inbound.json`](./clinicavida-inbound.json)
 
 Ativar cada um (toggle "Active"). Conferir que a `apikey` embutida nos nós HTTP
