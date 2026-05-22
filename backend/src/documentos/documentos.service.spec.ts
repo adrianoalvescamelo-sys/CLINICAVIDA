@@ -8,6 +8,14 @@ import { AuditResultado, TipoDocumento } from '@prisma/client';
 import { DocumentosService } from './documentos.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { gerarDocumentoPdf } from './documentos.pdf';
+
+jest.mock('./documentos.pdf', () => ({
+  gerarDocumentoPdf: jest.fn(async () => Buffer.from('%PDF-mock')),
+}));
+const gerarPdfMock = gerarDocumentoPdf as jest.MockedFunction<
+  typeof gerarDocumentoPdf
+>;
 
 const PAC = '22222222-2222-4222-8222-222222222222';
 const AG = '33333333-3333-4333-8333-333333333333';
@@ -66,7 +74,11 @@ describe('DocumentosService', () => {
 
   describe('criarDocumento', () => {
     it('médico cria ORIENTACOES: gera PDF, persiste, audita', async () => {
-      prisma.profissional.findUnique.mockResolvedValue({ ehMedico: true });
+      prisma.profissional.findUnique.mockResolvedValue({
+        ehMedico: true,
+        nomeCompleto: 'Dra. Ana',
+        registroConselho: 'CRM-MT 1234',
+      });
       prisma.paciente.findFirst.mockResolvedValue({ nomeCompleto: 'Fulano' });
       prisma._tx.documentoMedico.create.mockResolvedValue({
         id: DOC,
@@ -89,12 +101,49 @@ describe('DocumentosService', () => {
       expect((r as Record<string, unknown>).pdf).toBeUndefined();
       const createArg = prisma._tx.documentoMedico.create.mock.calls[0][0];
       expect(Buffer.isBuffer(createArg.data.pdf)).toBe(true);
+      // TD-DOC-5: PDF usa nome do profissional (+ registro), não email
+      expect(gerarPdfMock).toHaveBeenCalledWith(
+        expect.objectContaining({ autor: 'Dra. Ana (CRM-MT 1234)' }),
+      );
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           acao: 'GERACAO_DOCUMENTO',
           resultado: AuditResultado.SUCESSO,
         }),
       );
+    });
+
+    it('autor sem registro de profissional usa email (fallback)', async () => {
+      prisma.profissional.findUnique.mockResolvedValue(null);
+      prisma.paciente.findFirst.mockResolvedValue({ nomeCompleto: 'Fulano' });
+      prisma._tx.documentoMedico.create.mockResolvedValue({ id: DOC });
+      await service.criarDocumento(
+        PAC,
+        { tipo: TipoDocumento.ORIENTACOES, conteudo: { texto: 'x' } } as never,
+        MEDICO as never,
+        'ip',
+        't',
+      );
+      expect(gerarPdfMock).toHaveBeenCalledWith(
+        expect.objectContaining({ autor: MEDICO.email }),
+      );
+    });
+
+    it('texto de ORIENTACOES acima do limite → 400 (TD-DOC-6)', async () => {
+      prisma.profissional.findUnique.mockResolvedValue({ ehMedico: true });
+      prisma.paciente.findFirst.mockResolvedValue({ nomeCompleto: 'F' });
+      await expect(
+        service.criarDocumento(
+          PAC,
+          {
+            tipo: TipoDocumento.ORIENTACOES,
+            conteudo: { texto: 'a'.repeat(5001) },
+          } as never,
+          MEDICO as never,
+          'ip',
+          't',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('não-médico tentando RECEITA → 403', async () => {
@@ -191,6 +240,7 @@ describe('DocumentosService', () => {
 
   describe('listar', () => {
     it('médico lista todos do paciente (sem filtro de autor) e audita', async () => {
+      prisma.paciente.findFirst.mockResolvedValue({ id: PAC });
       prisma.documentoMedico.findMany.mockResolvedValue([{ id: DOC }]);
       const r = await service.listar(PAC, MEDICO as never, 'ip', 't');
       expect(r).toHaveLength(1);
@@ -203,10 +253,19 @@ describe('DocumentosService', () => {
     });
 
     it('não-médico lista só os próprios (filtro autorUsuarioId)', async () => {
+      prisma.paciente.findFirst.mockResolvedValue({ id: PAC });
       prisma.documentoMedico.findMany.mockResolvedValue([]);
       await service.listar(PAC, NAOMED as never, 'ip', 't');
       const whereArg = prisma.documentoMedico.findMany.mock.calls[0][0].where;
       expect(whereArg.autorUsuarioId).toBe(NAOMED.id);
+    });
+
+    it('paciente inexistente ou soft-deletado → 404 (TD-DOC-3)', async () => {
+      prisma.paciente.findFirst.mockResolvedValue(null);
+      await expect(
+        service.listar(PAC, MEDICO as never, 'ip', 't'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.documentoMedico.findMany).not.toHaveBeenCalled();
     });
   });
 

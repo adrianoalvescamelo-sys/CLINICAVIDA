@@ -318,6 +318,12 @@ describe('ProntuarioService', () => {
       await expect(
         service.retificar(EVO, dto as never, MEDICO as never, 'ip', 't'),
       ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          acao: 'RETIFICACAO_EVOLUCAO',
+          resultado: AuditResultado.NEGADO,
+        }),
+      );
     });
 
     it('retificar versão já substituída: 409', async () => {

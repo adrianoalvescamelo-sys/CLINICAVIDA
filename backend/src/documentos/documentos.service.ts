@@ -23,13 +23,18 @@ export class DocumentosService {
     private readonly audit: AuditService,
   ) {}
 
-  private async ehMedico(user: AuthUser): Promise<boolean> {
+  private async dadosAutor(
+    user: AuthUser,
+  ): Promise<{ ehMedico: boolean; nome: string }> {
     const prof = await this.prisma.profissional.findUnique({
       where: { usuarioId: user.id },
-      select: { ehMedico: true },
+      select: { ehMedico: true, nomeCompleto: true, registroConselho: true },
     });
-    if (prof) return prof.ehMedico;
-    return user.perfil === 'MEDICO';
+    if (prof) {
+      const reg = prof.registroConselho ? ` (${prof.registroConselho})` : '';
+      return { ehMedico: prof.ehMedico, nome: `${prof.nomeCompleto}${reg}` };
+    }
+    return { ehMedico: user.perfil === 'MEDICO', nome: user.email };
   }
 
   private isMedicoOuAdmin(user: AuthUser): boolean {
@@ -43,17 +48,26 @@ export class DocumentosService {
         message: `Conteúdo inválido para ${tipo}`,
       });
     };
+    // Limites de comprimento (TD-DOC-6): evita overflow/abuso em texto livre
+    const tooLong = (v: unknown, max: number) =>
+      typeof v === 'string' && v.length > max;
     if (tipo === TipoDocumento.ATESTADO) {
       if (typeof c.diasAfastamento !== 'number' || c.diasAfastamento < 1)
         erro();
+      if (tooLong(c.motivo, 500) || tooLong(c.cid, 10)) erro();
     } else if (tipo === TipoDocumento.RECEITA) {
       const m = c.medicamentos;
-      if (!Array.isArray(m) || m.length === 0) erro();
+      if (!Array.isArray(m) || m.length === 0 || m.length > 50) erro();
+      for (const item of m as { nome?: unknown; posologia?: unknown }[]) {
+        if (tooLong(item?.nome, 200) || tooLong(item?.posologia, 500)) erro();
+      }
     } else if (tipo === TipoDocumento.PEDIDO_EXAME) {
       const e = c.exames;
-      if (!Array.isArray(e) || e.length === 0) erro();
+      if (!Array.isArray(e) || e.length === 0 || e.length > 50) erro();
+      for (const ex of e as unknown[]) if (tooLong(ex, 200)) erro();
     } else if (tipo === TipoDocumento.ORIENTACOES) {
       if (typeof c.texto !== 'string' || c.texto.trim() === '') erro();
+      if (tooLong(c.texto, 5000)) erro();
     }
   }
 
@@ -64,9 +78,9 @@ export class DocumentosService {
     ip: string,
     trace: string,
   ) {
-    const autorEhMedico = await this.ehMedico(user);
+    const autor = await this.dadosAutor(user);
 
-    if (SO_MEDICO.includes(dto.tipo) && !autorEhMedico) {
+    if (SO_MEDICO.includes(dto.tipo) && !autor.ehMedico) {
       await this.audit.log({
         usuarioId: user.id,
         acao: 'GERACAO_DOCUMENTO',
@@ -112,7 +126,7 @@ export class DocumentosService {
     const pdf = await gerarDocumentoPdf({
       tipo: dto.tipo,
       paciente: paciente.nomeCompleto,
-      autor: user.email,
+      autor: autor.nome,
       conteudo: dto.conteudo,
     });
 
@@ -121,7 +135,7 @@ export class DocumentosService {
         data: {
           pacienteId,
           autorUsuarioId: user.id,
-          autorEhMedico,
+          autorEhMedico: autor.ehMedico,
           agendamentoId: dto.agendamentoId,
           tipo: dto.tipo,
           conteudo: dto.conteudo as Prisma.InputJsonValue,
@@ -166,6 +180,16 @@ export class DocumentosService {
   };
 
   async listar(pacienteId: string, user: AuthUser, ip: string, trace: string) {
+    const paciente = await this.prisma.paciente.findFirst({
+      where: { id: pacienteId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!paciente) {
+      throw new NotFoundException({
+        code: 'PACIENTE_NAO_ENCONTRADO',
+        message: 'Paciente não encontrado',
+      });
+    }
     const where: Prisma.DocumentoMedicoWhereInput = { pacienteId };
     if (!this.isMedicoOuAdmin(user)) {
       where.autorUsuarioId = user.id;

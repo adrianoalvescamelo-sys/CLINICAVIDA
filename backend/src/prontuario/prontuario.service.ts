@@ -181,6 +181,16 @@ export class ProntuarioService {
       });
     }
     if (orig.autorUsuarioId !== user.id) {
+      await this.audit.log({
+        usuarioId: user.id,
+        acao: 'RETIFICACAO_EVOLUCAO',
+        entidade: 'Evolucao',
+        registroId: orig.id,
+        ipDispositivo: ip,
+        resultado: AuditResultado.NEGADO,
+        traceId: trace,
+        detalhes: { motivo: 'NAO_AUTOR' } as Prisma.InputJsonValue,
+      });
       throw new ForbiddenException({
         code: 'NAO_AUTOR',
         message: 'Apenas o autor pode retificar a evolução',
