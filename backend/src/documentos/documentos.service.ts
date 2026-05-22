@@ -67,6 +67,16 @@ export class DocumentosService {
     const autorEhMedico = await this.ehMedico(user);
 
     if (SO_MEDICO.includes(dto.tipo) && !autorEhMedico) {
+      await this.audit.log({
+        usuarioId: user.id,
+        acao: 'GERACAO_DOCUMENTO',
+        entidade: 'DocumentoMedico',
+        registroId: null,
+        ipDispositivo: ip,
+        resultado: AuditResultado.NEGADO,
+        traceId: trace,
+        detalhes: { tipo: dto.tipo, pacienteId } as Prisma.InputJsonValue,
+      });
       throw new ForbiddenException({
         code: 'PERFIL_NAO_AUTORIZADO_DOCUMENTO',
         message: 'Apenas médico pode emitir receita ou atestado',
@@ -88,12 +98,12 @@ export class DocumentosService {
       }
     }
 
-    const paciente = await this.prisma.paciente.findUnique({
-      where: { id: pacienteId },
+    const paciente = await this.prisma.paciente.findFirst({
+      where: { id: pacienteId, deletedAt: null },
       select: { nomeCompleto: true },
     });
     if (!paciente) {
-      throw new BadRequestException({
+      throw new NotFoundException({
         code: 'PACIENTE_NAO_ENCONTRADO',
         message: 'Paciente não encontrado',
       });

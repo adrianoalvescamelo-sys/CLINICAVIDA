@@ -36,7 +36,7 @@ function makePrisma() {
     },
     agendamento: { findUnique: jest.fn() },
     profissional: { findUnique: jest.fn() },
-    paciente: { findUnique: jest.fn() },
+    paciente: { findUnique: jest.fn(), findFirst: jest.fn() },
     $transaction: jest.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
     _tx: tx,
   };
@@ -67,7 +67,7 @@ describe('DocumentosService', () => {
   describe('criarDocumento', () => {
     it('médico cria ORIENTACOES: gera PDF, persiste, audita', async () => {
       prisma.profissional.findUnique.mockResolvedValue({ ehMedico: true });
-      prisma.paciente.findUnique.mockResolvedValue({ nomeCompleto: 'Fulano' });
+      prisma.paciente.findFirst.mockResolvedValue({ nomeCompleto: 'Fulano' });
       prisma._tx.documentoMedico.create.mockResolvedValue({
         id: DOC,
         tipo: TipoDocumento.ORIENTACOES,
@@ -111,6 +111,46 @@ describe('DocumentosService', () => {
           't',
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma._tx.documentoMedico.create).not.toHaveBeenCalled();
+    });
+
+    it('não-médico tentando RECEITA: audita NEGADO', async () => {
+      prisma.profissional.findUnique.mockResolvedValue({ ehMedico: false });
+      await expect(
+        service.criarDocumento(
+          PAC,
+          {
+            tipo: TipoDocumento.RECEITA,
+            conteudo: { medicamentos: [{ nome: 'x', posologia: 'y' }] },
+          } as never,
+          NAOMED as never,
+          'ip',
+          't',
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          acao: 'GERACAO_DOCUMENTO',
+          resultado: AuditResultado.NEGADO,
+        }),
+      );
+    });
+
+    it('paciente inexistente ou soft-deletado → 404', async () => {
+      prisma.profissional.findUnique.mockResolvedValue({ ehMedico: true });
+      prisma.paciente.findFirst.mockResolvedValue(null);
+      await expect(
+        service.criarDocumento(
+          PAC,
+          {
+            tipo: TipoDocumento.ORIENTACOES,
+            conteudo: { texto: 'x' },
+          } as never,
+          MEDICO as never,
+          'ip',
+          't',
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma._tx.documentoMedico.create).not.toHaveBeenCalled();
     });
 

@@ -332,4 +332,14 @@ describe('Documentos (e2e) — Sprint 8', () => {
     });
     expect(baixou).not.toBeNull();
   });
+
+  // 13. MÉDICO POST para paciente inexistente → 404
+  it('MÉDICO POST para paciente inexistente → 404', async () => {
+    const inexistente = '00000000-0000-4000-8000-000000000000';
+    const res = await request(app.getHttpServer())
+      .post(`/api/pacientes/${inexistente}/documentos`)
+      .set(auth(tokenMedico))
+      .send({ tipo: 'ORIENTACOES', conteudo: { texto: 'x' } });
+    expect(res.status).toBe(404);
+  });
 });
