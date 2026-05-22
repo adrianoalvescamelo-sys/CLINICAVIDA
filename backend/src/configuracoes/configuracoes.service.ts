@@ -46,13 +46,15 @@ export class ConfiguracoesService {
     if (almocoIni && !almocoFim) {
       throw new BadRequestException({
         code: 'ALMOCO_INCOMPLETO',
-        message: 'intervaloAlmocoFim é obrigatório se intervaloAlmocoIni for definido',
+        message:
+          'intervaloAlmocoFim é obrigatório se intervaloAlmocoIni for definido',
       });
     }
     if (almocoFim && !almocoIni) {
       throw new BadRequestException({
         code: 'ALMOCO_INCOMPLETO',
-        message: 'intervaloAlmocoIni é obrigatório se intervaloAlmocoFim for definido',
+        message:
+          'intervaloAlmocoIni é obrigatório se intervaloAlmocoFim for definido',
       });
     }
     if (
@@ -69,7 +71,9 @@ export class ConfiguracoesService {
     const updated = await this.prisma.configuracaoClinica.update({
       where: { id: atual.id },
       data: {
-        ...(dto.nomeClinica !== undefined ? { nomeClinica: dto.nomeClinica } : {}),
+        ...(dto.nomeClinica !== undefined
+          ? { nomeClinica: dto.nomeClinica }
+          : {}),
         ...(dto.horaAbertura !== undefined
           ? { horaAbertura: dto.horaAbertura }
           : {}),

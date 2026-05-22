@@ -231,7 +231,9 @@ describe('Documentos (e2e) — Sprint 8', () => {
       .set(auth(tokenNaoMedico))
       .send({
         tipo: 'RECEITA',
-        conteudo: { medicamentos: [{ nome: 'Ibuprofeno', posologia: '1 cp 8/8h' }] },
+        conteudo: {
+          medicamentos: [{ nome: 'Ibuprofeno', posologia: '1 cp 8/8h' }],
+        },
       });
     expect(res.status).toBe(403);
   });
