@@ -19,7 +19,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://evolution-api-vyes-api-1:8080/message/sendText/clinicavida",
+        "url": "http://evolution-api-vyes-api-1:8080/message/sendText/clinicavida-app",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

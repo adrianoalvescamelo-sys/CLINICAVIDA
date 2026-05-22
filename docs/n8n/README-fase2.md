@@ -4,19 +4,33 @@ Liga o caminho real **backend → n8n → Evolution API → WhatsApp** e o retor
 **WhatsApp → Evolution → n8n → backend**, restrito por allowlist (ver
 [`docs/runbook-whatsapp.md`](../runbook-whatsapp.md)).
 
+## ⚠️ ATENÇÃO — infra compartilhada na VPS
+
+A VPS roda **outro sistema** (bot **financeiro**,
+`financeiro.clinicavidapopular.com.br`) no MESMO n8n e na MESMA Evolution.
+
+- A instância Evolution **`clinicavida`** (número `5517982056029`) é do **bot
+  financeiro**. Seu webhook aponta pra `whatsapp-financeiro`. **NÃO MEXER.**
+- O webhook `MESSAGES_UPSERT` da Evolution aponta pra **uma URL só** por
+  instância → app e financeiro não podem dividir o mesmo número no inbound.
+
+**Decisão (2026-05-21):** o app Clínica Vida usa uma **instância Evolution
+SEPARADA** (`clinicavida-app`) com **número próprio**. Assim o inbound não
+conflita com o financeiro.
+
 ## Topologia — comunicação por rede Docker interna
 
-As URLs **públicas** (`*.srv1477984.hstgr.cloud`) **não funcionam de dentro da
-VPS** (hairpin NAT falha → HTTP 000). Então backend, n8n e Evolution se falam
-por **DNS interno do Docker**, conectando os containers às redes uns dos outros.
+URLs **públicas** (`*.srv1477984.hstgr.cloud`) **não funcionam de dentro da
+VPS** (hairpin NAT → HTTP 000). Backend, n8n e Evolution se falam por **DNS
+interno do Docker**.
 
 ```
 backend (clinicavida-api-homolog:3000)
   → POST n8n http://n8n-upbl-n8n-1:5678/webhook/clinicavida-outbound
-      → POST Evolution http://evolution-api-vyes-api-1:8080/message/sendText/clinicavida → WhatsApp
+      → POST Evolution http://evolution-api-vyes-api-1:8080/message/sendText/clinicavida-app → WhatsApp
       → POST backend http://clinicavida-api-homolog:3000/api/bot/whatsapp/status
 
-WhatsApp → Evolution (MESSAGES_UPSERT)
+WhatsApp (nº do app) → Evolution inst. clinicavida-app (MESSAGES_UPSERT)
   → POST n8n http://n8n-upbl-n8n-1:5678/webhook/clinicavida-inbound
       → POST backend http://clinicavida-api-homolog:3000/api/bot/whatsapp/inbound
 ```
@@ -24,96 +38,84 @@ WhatsApp → Evolution (MESSAGES_UPSERT)
 Containers / portas internas:
 - backend: `clinicavida-api-homolog:3000` (rede `clinicavida-homolog_clinicavida-net`)
 - n8n: `n8n-upbl-n8n-1:5678` (rede `n8n-upbl_default`)
-- Evolution v2.3.7: `evolution-api-vyes-api-1:8080` (rede `evolution-api-vyes_default`), instância `clinicavida` pareada ao número `5517982056029`
+- Evolution v2.3.7: `evolution-api-vyes-api-1:8080` (rede `evolution-api-vyes_default`)
+- API interna Evolution: `http://127.0.0.1:32778` (a partir do host VPS)
 
-> Os JSONs já embutem `apikey` da Evolution e `x-bot-secret` do backend
-> (segredos de homolog). Se rotacionar, reeditar os 2 workflows.
-
-## 0. Conectar as redes Docker (uma vez)
+## 0. Redes Docker (uma vez)
 
 ```bash
 sudo docker network connect n8n-upbl_default            clinicavida-api-homolog   # api -> n8n
-sudo docker network connect evolution-api-vyes_default  n8n-upbl-n8n-1            # n8n -> evolution
 sudo docker network connect clinicavida-homolog_clinicavida-net n8n-upbl-n8n-1   # n8n -> backend
-sudo docker network connect n8n-upbl_default            evolution-api-vyes-api-1 # evolution -> n8n
+# n8n -> evolution: n8n JÁ está na rede evolution-api-vyes_default (não reconectar)
 ```
 
-Verificar (deve retornar `{"status":"ok"}` / JSON):
+> Persistência: api↔n8n fixado no `docker-compose.homolog.yml` (rede externa
+> `n8n-upbl_default`). A conexão `n8n-upbl-n8n-1`↔clinicavida-net é runtime —
+> re-rodar se a stack n8n for recriada.
+
+## 1. Criar e parear a instância `clinicavida-app` (número novo)
+
+Na VPS (usa `127.0.0.1:32778`; apikey global da Evolution):
+
 ```bash
-sudo docker exec clinicavida-api-homolog wget -qO- http://n8n-upbl-n8n-1:5678/healthz
-sudo docker exec n8n-upbl-n8n-1 wget -qO- http://evolution-api-vyes-api-1:8080/
-sudo docker exec n8n-upbl-n8n-1 wget -qO- http://clinicavida-api-homolog:3000/ready
-sudo docker exec evolution-api-vyes-api-1 wget -qO- http://n8n-upbl-n8n-1:5678/healthz
+K="<APIKEY_EVOLUTION>"
+# cria instância
+curl -X POST 'http://127.0.0.1:32778/instance/create' \
+  -H "apikey: $K" -H 'Content-Type: application/json' \
+  -d '{"instanceName":"clinicavida-app","integration":"WHATSAPP-BAILEYS","qrcode":true}'
+# pega QR pra parear o número novo (escanear no WhatsApp do app)
+curl "http://127.0.0.1:32778/instance/connect/clinicavida-app" -H "apikey: $K"
 ```
 
-> **Persistência:** a conexão api↔n8n está fixada no `docker-compose.homolog.yml`
-> (rede externa `n8n-upbl_default`), então sobrevive a recreate da API. As
-> conexões dos containers `n8n-upbl-n8n-1` e `evolution-api-vyes-api-1` são
-> runtime — se essas stacks forem recriadas, **rodar os connects de novo**.
+Escanear o QR com o **chip/número do app**. Conferir `connectionStatus: open`:
+```bash
+curl "http://127.0.0.1:32778/instance/fetchInstances" -H "apikey: $K"
+```
 
-## 1. Importar os workflows no n8n
+## 2. Webhook da instância `clinicavida-app` → n8n inbound
+
+> Só na instância `clinicavida-app`. **Nunca** rodar `webhook/set` na instância
+> `clinicavida` (financeiro).
+
+```bash
+curl -X POST 'http://127.0.0.1:32778/webhook/set/clinicavida-app' \
+  -H "apikey: $K" -H 'Content-Type: application/json' \
+  -d '{"webhook":{"enabled":true,"url":"http://n8n-upbl-n8n-1:5678/webhook/clinicavida-inbound","webhookByEvents":false,"events":["MESSAGES_UPSERT"]}}'
+```
+
+## 3. Importar + ativar os workflows no n8n
 
 UI n8n → **Workflows → Import from File**:
-1. [`clinicavida-outbound.json`](./clinicavida-outbound.json)
+1. [`clinicavida-outbound.json`](./clinicavida-outbound.json) (chama `sendText/clinicavida-app`)
 2. [`clinicavida-inbound.json`](./clinicavida-inbound.json)
 
-Após importar, **ativar** cada um (toggle "Active"). A URL de produção do
-webhook (`/webhook/<path>`) só responde com o workflow **Active**.
+Ativar cada um (toggle "Active"). Conferir que a `apikey` embutida nos nós HTTP
+bate com a da Evolution.
 
-## 2. Apontar a Evolution para o n8n inbound (URL interna)
+## 4. Backend: apontar n8n + sair do dry-run
 
-Rodar **na VPS** (usa `127.0.0.1:32778` — a pública dá HTTP 000):
-
-```bash
-curl -X POST 'http://127.0.0.1:32778/webhook/set/clinicavida' \
-  -H 'apikey: e9OrBMZNDCB2d4E1K8CZyCTss6yoxye7' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "webhook": {
-      "enabled": true,
-      "url": "http://n8n-upbl-n8n-1:5678/webhook/clinicavida-inbound",
-      "webhookByEvents": false,
-      "events": ["MESSAGES_UPSERT"]
-    }
-  }'
-```
-
-## 3. Backend: apontar para o n8n e sair do dry-run
-
-No `.env.homolog` (`/opt/clinicavida-homolog/.env.homolog`):
-
+`.env.homolog` (`/opt/clinicavida-homolog/.env.homolog`):
 ```
 N8N_WEBHOOK_URL=http://n8n-upbl-n8n-1:5678/webhook/clinicavida-outbound
 WA_ENABLED=true
 WA_DRY_RUN=false
-WA_ALLOWLIST=<numero_da_equipe_so_digitos>   # ex: 5566999990001
+WA_ALLOWLIST=<numero_da_equipe_so_digitos>
 ```
-
-Restart só a API:
 ```bash
 cd /opt/clinicavida-homolog
 sudo docker compose --env-file .env.homolog -f docker-compose.homolog.yml up -d api
 ```
 
-## 4. Teste (runbook Fase 2)
+## 5. Teste (runbook Fase 2)
 
-1. Cadastrar agendamento ~24h à frente, paciente com número **da allowlist**.
-2. Aguardar cron (até 10 min) ou observar `docker logs clinicavida-api-homolog -f`.
-3. Esperado: chega WhatsApp real; mensagem `ENVIADA` → `ENTREGUE` (callback status).
-4. Cadastrar outro com número **fora** da allowlist → log `motivoDryRun: "allowlist"`, nada enviado.
+1. Agendamento ~24h à frente, paciente com número **da allowlist**.
+2. Aguardar cron (≤10 min) ou `docker logs clinicavida-api-homolog -f`.
+3. Esperado: WhatsApp real do número do app; mensagem `ENVIADA` → `ENTREGUE`.
+4. Número fora da allowlist → log `motivoDryRun: "allowlist"`, nada enviado.
 
 ## ⚠️ Limitação conhecida — resposta SIM/NÃO não confirma agendamento ainda
 
-O inbound da Evolution **não carrega** o `eventId` da mensagem original. O
-backend (`receberResposta`) só dispara confirmação/cancelamento automático com
-`eventIdOriginal`. Sem ele, a resposta é **registrada** (mensagem INBOUND,
-vinculada ao paciente por telefone) mas **não muda o status** do agendamento.
-
-**Follow-up (PR backend):** em `receberResposta`, quando `eventIdOriginal`
-ausente, localizar a última mensagem OUTBOUND de confirmação
-(`CONFIRMACAO_24H`/`LEMBRETE_2H`) para aquele telefone com `agendamentoId` e
-agendamento pendente, e processar a resposta sobre ela. Só então o loop
-SIM→CONFIRMADO / NÃO→CANCELADO funciona ponta a ponta.
-
-Até lá, Fase 2 valida **apenas o envio outbound real**; a recepção confirma/
-cancela manualmente a partir da resposta registrada na tela WhatsApp.
+Inbound da Evolution não traz o `eventId` original. `receberResposta` só dispara
+confirmação/cancelamento com `eventIdOriginal`; sem ele, registra a resposta mas
+não muda o status. **Follow-up (PR backend):** localizar a última msg OUTBOUND de
+confirmação por telefone e processar sobre ela. Até lá, recepção confirma manual.
