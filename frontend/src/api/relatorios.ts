@@ -120,8 +120,10 @@ export async function getOrigemAgendamentos(
 // ---------------------------------------------------------------------------
 
 function buildUrl(path: string, params: Record<string, string | undefined>): string {
-  const base = (import.meta.env.VITE_API_URL as string) ?? 'http://localhost:3000/api';
-  const url = new URL(`${base}${path}`);
+  // Mesma origem do app (nginx serve /api em prod; Vite faz proxy de /api em dev),
+  // espelhando o baseURL '/api' do axios client. new URL(relativo, origin) resolve
+  // sem lançar "Invalid URL" quando a base é relativa ('/api').
+  const url = new URL(`/api${path}`, window.location.origin);
   for (const [k, v] of Object.entries(params)) {
     if (v) url.searchParams.set(k, v);
   }
