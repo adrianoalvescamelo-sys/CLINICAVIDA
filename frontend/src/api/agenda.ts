@@ -22,6 +22,7 @@ export async function listAgendamentos(params: {
   inicio?: string;
   fim?: string;
   profissionalId?: string;
+  pacienteId?: string;
   status?: AgendamentoStatus;
 }): Promise<AgendamentoListItem[]> {
   const { data } = await api.get<Env<AgendamentoListItem[]>>('/agendamentos', {
