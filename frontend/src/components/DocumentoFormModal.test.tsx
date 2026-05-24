@@ -67,4 +67,27 @@ describe('DocumentoFormModal', () => {
       tipo: 'ATESTADO', conteudo: expect.objectContaining({ diasAfastamento: 3 }),
     })));
   });
+
+  it('RECEITA envia lista de medicamentos', async () => {
+    const criar = vi.spyOn(documentosApi, 'criarDocumento').mockResolvedValue({ id: 'd' } as never);
+    renderModal();
+    fireEvent.change(screen.getByLabelText(/tipo/i), { target: { value: 'RECEITA' } });
+    fireEvent.change(screen.getByLabelText(/medicamento 1 nome/i), { target: { value: 'Dipirona' } });
+    fireEvent.change(screen.getByLabelText(/medicamento 1 posologia/i), { target: { value: '1cp 8/8h' } });
+    fireEvent.click(screen.getByRole('button', { name: /emitir/i }));
+    await waitFor(() => expect(criar).toHaveBeenCalledWith('pac-1', expect.objectContaining({
+      tipo: 'RECEITA', conteudo: { medicamentos: [{ nome: 'Dipirona', posologia: '1cp 8/8h' }] },
+    })));
+  });
+
+  it('PEDIDO_EXAME envia lista de exames', async () => {
+    const criar = vi.spyOn(documentosApi, 'criarDocumento').mockResolvedValue({ id: 'd' } as never);
+    renderModal();
+    fireEvent.change(screen.getByLabelText(/tipo/i), { target: { value: 'PEDIDO_EXAME' } });
+    fireEvent.change(screen.getByLabelText(/exame 1/i), { target: { value: 'Hemograma' } });
+    fireEvent.click(screen.getByRole('button', { name: /emitir/i }));
+    await waitFor(() => expect(criar).toHaveBeenCalledWith('pac-1', expect.objectContaining({
+      tipo: 'PEDIDO_EXAME', conteudo: { exames: ['Hemograma'] },
+    })));
+  });
 });

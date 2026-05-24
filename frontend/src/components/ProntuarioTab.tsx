@@ -61,12 +61,12 @@ export default function ProntuarioTab({ pacienteId }: { pacienteId: string }) {
         open={novoOpen}
         pacienteId={pacienteId}
         onClose={() => setNovoOpen(false)}
-        onSaved={() => { setNovoOpen(false); refetch(); }}
+        onSaved={() => { setNovoOpen(false); void refetch(); }}
       />
       <RetificarEvolucaoModal
         evolucao={retificar}
         onClose={() => setRetificar(null)}
-        onSaved={() => { setRetificar(null); refetch(); }}
+        onSaved={() => { setRetificar(null); void refetch(); }}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { listAgendamentos } from '../api/agenda';
 import { criarEvolucao } from '../api/prontuario';
@@ -23,6 +23,18 @@ export default function EvolucaoFormModal({ open, pacienteId, onClose, onSaved }
   const [plano, setPlano] = useState('');
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setAgendamentoId('');
+      setQueixa('');
+      setSubjetivo('');
+      setObjetivo('');
+      setAvaliacao('');
+      setPlano('');
+      setErro('');
+    }
+  }, [open]);
 
   const { data: agendamentos } = useQuery({
     queryKey: ['agendamentos', 'paciente', pacienteId],

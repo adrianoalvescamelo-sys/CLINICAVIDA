@@ -52,4 +52,11 @@ describe('PacienteEditarPage — abas RBAC', () => {
     renderAt('/pacientes/pac-1?aba=prontuario');
     expect(screen.queryByText('Prontuário')).not.toBeInTheDocument();
   });
+
+  it('ADMIN vê abas clínicas', () => {
+    setUser('ADMIN');
+    renderAt('/pacientes/pac-1');
+    expect(screen.getByRole('button', { name: 'Prontuário' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Documentos' })).toBeInTheDocument();
+  });
 });

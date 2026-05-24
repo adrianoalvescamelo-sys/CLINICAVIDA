@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { listAgendamentos } from '../api/agenda';
 import { criarDocumento } from '../api/documentos';
@@ -33,6 +33,21 @@ export default function DocumentoFormModal({ open, pacienteId, onClose, onSaved 
   const [motivo, setMotivo] = useState('');
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([{ nome: '', posologia: '' }]);
   const [exames, setExames] = useState<string[]>(['']);
+
+  useEffect(() => {
+    if (open) {
+      setTipo(tiposDisponiveis[0]);
+      setAgendamentoId('');
+      setErro('');
+      setTexto('');
+      setDias('');
+      setCid('');
+      setMotivo('');
+      setMedicamentos([{ nome: '', posologia: '' }]);
+      setExames(['']);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const { data: agendamentos } = useQuery({
     queryKey: ['agendamentos', 'paciente', pacienteId],

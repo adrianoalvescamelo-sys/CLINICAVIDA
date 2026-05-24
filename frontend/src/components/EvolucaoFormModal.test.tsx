@@ -54,4 +54,28 @@ describe('EvolucaoFormModal', () => {
     await waitFor(() => expect(screen.getByText(/selecione um agendamento/i)).toBeInTheDocument());
     expect(criar).not.toHaveBeenCalled();
   });
+
+  it('limpa campos ao reabrir', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { rerender } = render(
+      <QueryClientProvider client={qc}>
+        <EvolucaoFormModal open pacienteId="pac-1" onClose={vi.fn()} onSaved={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    await screen.findByRole('option', { name: /Dr/ });
+    fireEvent.change(screen.getByLabelText(/subjetivo/i), { target: { value: 'rascunho' } });
+    // fecha
+    rerender(
+      <QueryClientProvider client={qc}>
+        <EvolucaoFormModal open={false} pacienteId="pac-1" onClose={vi.fn()} onSaved={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    // reabre
+    rerender(
+      <QueryClientProvider client={qc}>
+        <EvolucaoFormModal open pacienteId="pac-1" onClose={vi.fn()} onSaved={vi.fn()} />
+      </QueryClientProvider>,
+    );
+    expect((screen.getByLabelText(/subjetivo/i) as HTMLTextAreaElement).value).toBe('');
+  });
 });
