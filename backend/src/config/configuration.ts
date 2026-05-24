@@ -37,6 +37,18 @@ export default () => ({
       .map((n) => n.replace(/\D/g, ''))
       .filter((n) => n.length > 0),
   },
+  ai: {
+    enabled: (process.env.AI_ENABLED ?? 'true').toLowerCase() === 'true',
+    providerDefault: (
+      process.env.AI_PROVIDER_DEFAULT ?? 'anthropic'
+    ).toLowerCase(),
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
+    anthropicModel: process.env.ANTHROPIC_MODEL ?? 'claude-opus-4-7',
+    openaiApiKey: process.env.OPENAI_API_KEY ?? '',
+    openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4o',
+    timeoutMs: parseInt(process.env.AI_TIMEOUT_MS ?? '60000', 10),
+    maxTokens: parseInt(process.env.AI_MAX_TOKENS ?? '1024', 10),
+  },
 });
 
 export function validateEnv(config: Record<string, unknown>) {
