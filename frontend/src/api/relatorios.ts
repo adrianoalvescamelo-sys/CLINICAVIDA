@@ -1,4 +1,5 @@
 import { api } from './client';
+import { apiUrl, downloadAutenticado } from './download';
 
 interface Env<T> {
   success: boolean;
@@ -116,28 +117,19 @@ export async function getOrigemAgendamentos(
 }
 
 // ---------------------------------------------------------------------------
-// Exports (admin only) — dispara download via window.open
+// Exports (admin only) — dispara download autenticado via helper compartilhado
 // ---------------------------------------------------------------------------
-
-function buildUrl(path: string, params: Record<string, string | undefined>): string {
-  // Mesma origem do app (nginx serve /api em prod; Vite faz proxy de /api em dev),
-  // espelhando o baseURL '/api' do axios client. new URL(relativo, origin) resolve
-  // sem lançar "Invalid URL" quando a base é relativa ('/api').
-  const url = new URL(`/api${path}`, window.location.origin);
-  for (const [k, v] of Object.entries(params)) {
-    if (v) url.searchParams.set(k, v);
-  }
-  return url.toString();
-}
 
 export function exportXlsx(
   tipo: 'agenda-dia' | 'agendamentos-status' | 'pacientes' | 'origem',
   params: Record<string, string | undefined>,
   token: string,
 ): void {
-  // Usa fetch para incluir o header Authorization e acionar download
-  const url = buildUrl(`/relatorios/export/${tipo}/xlsx`, params);
-  fetchAndDownload(url, token, `relatorio-${tipo}.xlsx`);
+  downloadAutenticado(
+    apiUrl(`/relatorios/export/${tipo}/xlsx`, params),
+    token,
+    `relatorio-${tipo}.xlsx`,
+  );
 }
 
 export function exportPdf(
@@ -145,26 +137,9 @@ export function exportPdf(
   params: Record<string, string | undefined>,
   token: string,
 ): void {
-  const url = buildUrl(`/relatorios/export/${tipo}/pdf`, params);
-  fetchAndDownload(url, token, `relatorio-${tipo}.pdf`);
-}
-
-function fetchAndDownload(url: string, token: string, filename: string): void {
-  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    .then((res) => {
-      if (!res.ok) throw new Error(`Export falhou: ${res.status}`);
-      return res.blob();
-    })
-    .then((blob) => {
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = href;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(href);
-    })
-    .catch((err) => {
-      console.error('Falha no download:', err);
-      window.alert('Falha ao gerar arquivo. Verifique suas permissoes.');
-    });
+  downloadAutenticado(
+    apiUrl(`/relatorios/export/${tipo}/pdf`, params),
+    token,
+    `relatorio-${tipo}.pdf`,
+  );
 }
