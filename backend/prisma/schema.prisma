@@ -9,21 +9,23 @@ datasource db {
 }
 
 model Usuario {
-  id              String         @id @default(uuid()) @db.Uuid
-  email           String         @unique
-  senhaHash       String         @map("senha_hash")
-  nomeCompleto    String         @map("nome_completo")
-  perfil          PerfilTipo
-  ativo           Boolean        @default(true)
-  tentativasLogin Int            @default(0) @map("tentativas_login")
-  bloqueadoAte    DateTime?      @map("bloqueado_ate")
-  ultimoLoginEm   DateTime?      @map("ultimo_login_em")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-  auditorias      Auditoria[]
-  refreshTokens   RefreshToken[]
-  evolucoes       Evolucao[]
-  documentos      DocumentoMedico[]
+  id                   String            @id @default(uuid()) @db.Uuid
+  email                String            @unique
+  senhaHash            String            @map("senha_hash")
+  nomeCompleto         String            @map("nome_completo")
+  perfil               PerfilTipo
+  ativo                Boolean           @default(true)
+  tentativasLogin      Int               @default(0) @map("tentativas_login")
+  bloqueadoAte         DateTime?         @map("bloqueado_ate")
+  ultimoLoginEm        DateTime?         @map("ultimo_login_em")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  auditorias           Auditoria[]
+  refreshTokens        RefreshToken[]
+  evolucoes            Evolucao[]
+  documentos           DocumentoMedico[]
+  sugestoesIaAutor     SugestaoIA[]      @relation("SugestaoAutor")
+  sugestoesIaAprovadas SugestaoIA[]      @relation("SugestaoAprovador")
 
   @@map("usuarios")
 }
@@ -69,6 +71,7 @@ model Paciente {
   historico          PacienteHistorico[]
   prontuario         Prontuario?
   documentos         DocumentoMedico[]
+  sugestoesIa        SugestaoIA[]
 
   @@index([nomeCompleto])
   @@index([telefoneWhatsapp])
@@ -143,6 +146,7 @@ model Agendamento {
   mensagens          MensagemWhatsapp[]
   evolucoes          Evolucao[]
   documentos         DocumentoMedico[]
+  sugestoesIa        SugestaoIA[]
 
   @@index([profissionalId, dataHoraInicio])
   @@index([pacienteId, dataHoraInicio])
@@ -246,17 +250,17 @@ model Auditoria {
 }
 
 model ConfiguracaoClinica {
-  id                  String   @id @default(uuid()) @db.Uuid
-  nomeClinica         String   @default("Clínica Vida Popular") @map("nome_clinica")
-  horaAbertura        String   @default("07:00") @map("hora_abertura") @db.VarChar(5)
-  horaFechamento      String   @default("19:00") @map("hora_fechamento") @db.VarChar(5)
-  diasFuncionamento   Int[]    @default([1, 2, 3, 4, 5, 6]) @map("dias_funcionamento")
-  duracaoConsultaMin  Int      @default(30) @map("duracao_consulta_min")
-  intervaloAlmocoIni  String?  @map("intervalo_almoco_ini") @db.VarChar(5)
-  intervaloAlmocoFim  String?  @map("intervalo_almoco_fim") @db.VarChar(5)
-  timezone            String   @default("America/Cuiaba")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-  atualizadoPor       String?  @map("atualizado_por") @db.Uuid
+  id                 String   @id @default(uuid()) @db.Uuid
+  nomeClinica        String   @default("Clínica Vida Popular") @map("nome_clinica")
+  horaAbertura       String   @default("07:00") @map("hora_abertura") @db.VarChar(5)
+  horaFechamento     String   @default("19:00") @map("hora_fechamento") @db.VarChar(5)
+  diasFuncionamento  Int[]    @default([1, 2, 3, 4, 5, 6]) @map("dias_funcionamento")
+  duracaoConsultaMin Int      @default(30) @map("duracao_consulta_min")
+  intervaloAlmocoIni String?  @map("intervalo_almoco_ini") @db.VarChar(5)
+  intervaloAlmocoFim String?  @map("intervalo_almoco_fim") @db.VarChar(5)
+  timezone           String   @default("America/Cuiaba")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  atualizadoPor      String?  @map("atualizado_por") @db.Uuid
 
   @@map("configuracoes_clinica")
 }
@@ -352,29 +356,75 @@ model Prontuario {
 }
 
 model Evolucao {
-  id              String      @id @default(uuid()) @db.Uuid
-  prontuarioId    String      @map("prontuario_id") @db.Uuid
-  agendamentoId   String      @map("agendamento_id") @db.Uuid
-  autorUsuarioId  String      @map("autor_usuario_id") @db.Uuid
-  autorEhMedico   Boolean     @map("autor_eh_medico")
-  queixaPrincipal String?     @map("queixa_principal")
+  id              String   @id @default(uuid()) @db.Uuid
+  prontuarioId    String   @map("prontuario_id") @db.Uuid
+  agendamentoId   String   @map("agendamento_id") @db.Uuid
+  autorUsuarioId  String   @map("autor_usuario_id") @db.Uuid
+  autorEhMedico   Boolean  @map("autor_eh_medico")
+  queixaPrincipal String?  @map("queixa_principal")
   subjetivo       String
   objetivo        String
   avaliacao       String
   plano           String
-  versao          Int         @default(1)
-  replacesId      String?     @unique @map("replaces_id") @db.Uuid
-  createdAt       DateTime    @default(now()) @map("created_at")
+  versao          Int      @default(1)
+  replacesId      String?  @unique @map("replaces_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
 
   prontuario  Prontuario  @relation(fields: [prontuarioId], references: [id])
   agendamento Agendamento @relation(fields: [agendamentoId], references: [id])
   autor       Usuario     @relation(fields: [autorUsuarioId], references: [id])
   replaces    Evolucao?   @relation("Retificacao", fields: [replacesId], references: [id])
   replacedBy  Evolucao?   @relation("Retificacao")
+  sugestaoIa  SugestaoIA?
 
   @@index([prontuarioId, createdAt])
   @@index([autorUsuarioId])
   @@map("evolucoes")
+}
+
+enum TipoSugestaoIA {
+  RESUMO
+  HIPOTESE
+  CONDUTA
+  ORIENTACOES
+}
+
+enum StatusSugestaoIA {
+  GERADA
+  APROVADA
+  REJEITADA
+  FALHA
+}
+
+model SugestaoIA {
+  id                   String           @id @default(uuid()) @db.Uuid
+  pacienteId           String           @map("paciente_id") @db.Uuid
+  agendamentoId        String?          @map("agendamento_id") @db.Uuid
+  evolucaoId           String?          @unique @map("evolucao_id") @db.Uuid
+  tipo                 TipoSugestaoIA
+  status               StatusSugestaoIA @default(GERADA)
+  provider             String?
+  modelo               String?
+  promptVersao         String?          @map("prompt_versao")
+  conteudoGerado       String?          @map("conteudo_gerado")
+  conteudoAprovado     String?          @map("conteudo_aprovado")
+  tokensPrompt         Int?             @map("tokens_prompt")
+  tokensResposta       Int?             @map("tokens_resposta")
+  erroMensagem         String?          @map("erro_mensagem")
+  autorUsuarioId       String           @map("autor_usuario_id") @db.Uuid
+  aprovadoPorUsuarioId String?          @map("aprovado_por_usuario_id") @db.Uuid
+  aprovadoEm           DateTime?        @map("aprovado_em")
+  createdAt            DateTime         @default(now()) @map("created_at")
+
+  paciente    Paciente     @relation(fields: [pacienteId], references: [id])
+  agendamento Agendamento? @relation(fields: [agendamentoId], references: [id])
+  evolucao    Evolucao?    @relation(fields: [evolucaoId], references: [id])
+  autor       Usuario      @relation("SugestaoAutor", fields: [autorUsuarioId], references: [id])
+  aprovadoPor Usuario?     @relation("SugestaoAprovador", fields: [aprovadoPorUsuarioId], references: [id])
+
+  @@index([pacienteId, createdAt])
+  @@index([autorUsuarioId])
+  @@map("sugestoes_ia")
 }
 
 enum TipoDocumento {
